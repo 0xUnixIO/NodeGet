@@ -72,7 +72,7 @@ jobs:
 
       - name: Compress binary
         if: ${{ !matrix.platform.no_upx }}
-        run: upx --brute ./target/${{ matrix.platform.target }}/minimal/nodeget-agent
+        run: upx --lzma ./target/${{ matrix.platform.target }}/minimal/nodeget-agent
 
       - name: Rename binary
         run: cp ./target/${{ matrix.platform.target }}/minimal/nodeget-agent ./target/${{ matrix.platform.target }}/minimal/${{ matrix.platform.binary_name }}
