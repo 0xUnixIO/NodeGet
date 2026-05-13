@@ -260,6 +260,49 @@ pub struct DynamicSummaryQuery {
     pub condition: Vec<QueryCondition>,
 }
 
+
+// 动态监控摘要平均值查询结构体
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DynamicSummaryAvgQuery {
+    pub fields: Vec<DynamicSummaryQueryField>,
+    pub uuid: uuid::Uuid,
+    pub timestamp_from: Option<i64>,
+    pub timestamp_to: Option<i64>,
+    pub points: u64,
+}
+
+// 批量历史查询：一次请求取多个节点的历史记录，避免 N 次串行请求
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DynamicSummaryHistoryMultiQuery {
+    pub uuids: Vec<uuid::Uuid>,
+    pub from: i64,
+    pub to: i64,
+    pub fields: Vec<DynamicSummaryQueryField>,
+}
+
+// 固定时间轴桶化查询：将 [from, to] 均分为 buckets 个桶，每桶含 COUNT 和字段 AVG
+// 空桶（离线期间）保留为 count=0、字段为 null，可正确渲染离线状态
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DynamicSummaryBucketsQuery {
+    pub uuid: uuid::Uuid,
+    pub from: i64,
+    pub to: i64,
+    pub buckets: u32,
+    pub fields: Vec<DynamicSummaryQueryField>,
+}
+
+// 多节点聚合桶化查询：将 [from, to] 均分为 buckets 个桶，对多个节点的字段做 SUM 聚合
+// 用于首页 Aggregate Traffic 等跨节点汇总场景
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DynamicSummaryBucketsMultiQuery {
+    pub uuids: Vec<uuid::Uuid>,
+    pub from: i64,
+    pub to: i64,
+    pub buckets: u32,
+    pub fields: Vec<DynamicSummaryQueryField>,
+}
+
+
 // 动态监控摘要数据响应项结构体
 #[derive(Serialize)]
 pub struct DynamicSummaryResponseItem {

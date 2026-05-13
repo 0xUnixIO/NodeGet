@@ -86,6 +86,16 @@ pub async fn report_dynamic_summary(
             .update_dynamic_summary(agent_uuid, data.time.cast_signed(), &data)
             .await;
 
+        // 向所有 WebSocket 订阅者广播实时推送事件
+        let event = crate::monitoring_push::DynamicSummaryEvent::from_data(
+            agent_uuid,
+            data.time.cast_signed(),
+            &data,
+        );
+        crate::monitoring_push::DynamicPushRegistry::global()
+            .broadcast(event)
+            .await;
+
         debug!(target: "monitoring", agent_uuid = %data.uuid, "Dynamic summary data buffered successfully");
 
         RawValue::from_string(r#"{"status":"buffered"}"#.to_owned())

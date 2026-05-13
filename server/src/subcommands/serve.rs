@@ -67,6 +67,7 @@ pub async fn run(config: &nodeget_lib::config::server::ServerConfig) {
             RpcTimingMiddleware {
                 service,
                 level: tracing::Level::TRACE,
+                _conn_guard: std::sync::Arc::new(crate::ws_counter::ConnectionGuard::new()),
             }
         });
 
@@ -266,6 +267,12 @@ pub async fn run(config: &nodeget_lib::config::server::ServerConfig) {
                     },
                 ),
             )
+            .route(
+                "/nodeget/record-visit",
+                any(|req: axum::extract::Request| async move {
+                    crate::visitor_stats::record_handler(req).await
+                }),
+            )
             .route("/terminal", any(crate::terminal::terminal_ws_handler))
             .with_state(terminal_state)
             .fallback(any(move |req: axum::extract::Request| {
@@ -286,6 +293,23 @@ pub async fn run(config: &nodeget_lib::config::server::ServerConfig) {
 
     init_crontab_worker();
     debug!(target: "server", "Crontab worker initialized");
+
+    // 每天 UTC 零点聚合 visit_log 历史数据到 visit_daily_stats
+    tokio::spawn(async {
+        loop {
+            let now = chrono::Utc::now();
+            let tomorrow_midnight = (now.date_naive() + chrono::Duration::days(1))
+                .and_hms_opt(0, 0, 0)
+                .unwrap()
+                .and_utc();
+            let sleep_secs =
+                (tomorrow_midnight.timestamp() - now.timestamp()).max(60) as u64;
+            tokio::time::sleep(std::time::Duration::from_secs(sleep_secs)).await;
+            if let Some(db) = crate::DB.get() {
+                crate::visitor_stats::aggregate_past_days(db).await;
+            }
+        }
+    });
 
     #[cfg(not(target_os = "windows"))]
     let mut unix_server_task: Option<tokio::task::JoinHandle<()>> = None;

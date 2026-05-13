@@ -7,7 +7,7 @@ use std::time::Duration;
 use tokio::fs;
 
 pub const DEFAULT_AGENT_CONFIG_PATH: &str = "config.toml";
-pub const DEFAULT_DYNAMIC_REPORT_INTERVAL_MS: u64 = 1000;
+pub const DEFAULT_DYNAMIC_REPORT_INTERVAL_MS: u64 = 15_000;
 pub const DEFAULT_DYNAMIC_SUMMARY_REPORT_INTERVAL_MS: u64 = 1000;
 pub const DEFAULT_STATIC_REPORT_INTERVAL_MS: u64 = 300_000;
 pub const DEFAULT_CONNECT_TIMEOUT_MS: u64 = 1000;

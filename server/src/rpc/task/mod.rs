@@ -22,6 +22,7 @@ mod create_task;
 mod create_task_blocking;
 mod delete;
 mod query;
+mod query_latest_per_node;
 mod upload_task_result;
 
 #[rpc(server, namespace = "task")]
@@ -65,6 +66,14 @@ pub trait Rpc {
         &self,
         token: String,
         conditions: Vec<TaskQueryCondition>,
+    ) -> RpcResult<Box<RawValue>>;
+
+    /// 返回每个 (uuid, cron_source) 组合的最新一条记录，用于页面启动时的初始快照
+    #[method(name = "query_latest_per_node")]
+    async fn query_latest_per_node(
+        &self,
+        token: String,
+        task_type: String,
     ) -> RpcResult<Box<RawValue>>;
 }
 
@@ -152,6 +161,18 @@ impl RpcServer for TaskRpcImpl {
         let (tk, un) = token_identity(&token);
         let span = tracing::info_span!(target: "task", "task::delete", token_key = tk, username = un, conditions = ?conditions);
         async { rpc_exec!(delete::delete(token, conditions).await) }
+            .instrument(span)
+            .await
+    }
+
+    async fn query_latest_per_node(
+        &self,
+        token: String,
+        task_type: String,
+    ) -> RpcResult<Box<RawValue>> {
+        let (tk, un) = token_identity(&token);
+        let span = tracing::info_span!(target: "task", "task::query_latest_per_node", token_key = tk, username = un, task_type = %task_type);
+        async { rpc_exec!(query_latest_per_node::query_latest_per_node(token, task_type).await) }
             .instrument(span)
             .await
     }

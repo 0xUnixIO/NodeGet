@@ -1,0 +1,116 @@
+name: nodeget-agent-build
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  agent-release:
+    name: Build - ${{ matrix.platform.release_for }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - release_for: linux_x86_64_musl
+            target: x86_64-unknown-linux-musl
+            runner: ubuntu-latest
+            binary_name: nodeget-agent-linux-x86_64-musl
+            use_cross: true
+          - release_for: linux_aarch64_musl
+            target: aarch64-unknown-linux-musl
+            runner: ubuntu-24.04-arm
+            binary_name: nodeget-agent-linux-aarch64-musl
+            use_cross: false
+
+    runs-on: ${{ matrix.platform.runner }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set version in Cargo.toml
+        shell: python3 {0}
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          import re, os
+          from datetime import datetime, timezone
+          tag = os.environ.get('TAG', '')
+          if tag.startswith('v') and len(tag) == 13:
+              semver = f'{tag[1:]}.0.0'
+          else:
+              now = datetime.now(timezone.utc)
+              semver = f'{now.strftime("%Y%m%d%H%M")}.0.0'
+          for f in ['nodeget-lib/Cargo.toml', 'server/Cargo.toml', 'agent/Cargo.toml']:
+              c = open(f).read()
+              open(f, 'w').write(re.sub(r'^version = .+', f'version = "{semver}"', c, count=1, flags=re.M))
+          print(f'Version set to {semver}')
+
+      - name: Setup Rust
+        uses: ./.github/actions/setup-system
+        with:
+          toolchain: stable
+          components: clippy
+
+      - name: Install Cross
+        if: matrix.platform.use_cross
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cross
+
+      - name: Add musl target (native build)
+        if: ${{ !matrix.platform.use_cross }}
+        run: rustup target add ${{ matrix.platform.target }}
+
+      - name: Build binary
+        working-directory: ./agent
+        run: cargo clean && ${{ matrix.platform.use_cross && 'cross' || 'cargo' }} build --target ${{ matrix.platform.target }} --profile minimal
+        env:
+          CROSS_NO_WARNINGS: 0
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
+
+      - name: Compress binary
+        if: ${{ !matrix.platform.no_upx }}
+        run: upx --lzma ./target/${{ matrix.platform.target }}/minimal/nodeget-agent
+
+      - name: Rename binary
+        run: cp ./target/${{ matrix.platform.target }}/minimal/nodeget-agent ./target/${{ matrix.platform.target }}/minimal/${{ matrix.platform.binary_name }}
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-${{ matrix.platform.target }}
+          path: target/${{ matrix.platform.target }}/minimal/${{ matrix.platform.binary_name }}
+          if-no-files-found: error
+
+  release:
+    name: Release
+    needs: agent-release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: agent-*
+          path: artifacts
+          merge-multiple: true
+
+      - name: Resolve tag
+        id: tag
+        run: |
+          if [[ "${{ github.ref_name }}" == v* ]]; then
+            echo "value=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=v$(date -u +"%Y%m%d%H%M")" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.value }}
+          name: "NodeGet ${{ steps.tag.outputs.value }}"
+          make_latest: true
+          files: artifacts/*
