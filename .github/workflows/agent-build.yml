@@ -50,11 +50,13 @@ jobs:
           components: clippy
 
       - name: Install Cross
-        run: cargo install cross --git https://github.com/cross-rs/cross
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cross
 
       - name: Build binary
         working-directory: ./agent
-        run: cargo clean && cross build --target ${{ matrix.platform.target }} --profile minimal --jobs 32
+        run: cargo clean && cross build --target ${{ matrix.platform.target }} --profile minimal
         env:
           CROSS_NO_WARNINGS: 0
 

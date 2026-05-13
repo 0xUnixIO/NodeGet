@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  RUST_IMAGE: rustlang/rust:nightly-alpine3.22
+  RUST_IMAGE: rust:stable-alpine3.22
   IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/nodeget
 
 jobs:
