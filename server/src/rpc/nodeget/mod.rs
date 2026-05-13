@@ -50,6 +50,9 @@ pub trait Rpc {
 
     #[method(name = "self_update")]
     async fn self_update(&self, token: String, tag: String) -> RpcResult<()>;
+
+    #[method(name = "active_connections")]
+    async fn active_connections(&self) -> usize;
 }
 
 #[derive(Clone)]
@@ -248,6 +251,10 @@ impl RpcServer for NodegetServerRpcImpl {
         }.instrument(forward_span));
 
         Ok(())
+    }
+
+    async fn active_connections(&self) -> usize {
+        crate::ws_counter::get()
     }
 
     async fn self_update(&self, token: String, tag: String) -> RpcResult<()> {

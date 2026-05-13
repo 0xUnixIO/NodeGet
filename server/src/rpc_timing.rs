@@ -1,18 +1,16 @@
+use crate::ws_counter::ConnectionGuard;
 use jsonrpsee::server::middleware::rpc::{Batch, Notification, Request, RpcServiceT};
 use std::future::Future;
+use std::sync::Arc;
 use std::time::Instant;
 use tracing::Level;
 
-/// RPC request timing middleware.
-///
-/// All tracing in this module intentionally uses `target: "rpc"` rather than a
-/// module-specific target, because the middleware is a cross-cutting RPC
-/// framework concern — it measures every RPC call/batch/notification regardless
-/// of which business module handles it.
 #[derive(Clone)]
 pub struct RpcTimingMiddleware<S> {
     pub service: S,
     pub level: Level,
+    /// 每条 WS 连接持有一份，连接断开（所有 clone 析构）时自动 -1
+    _conn_guard: Arc<ConnectionGuard>,
 }
 
 fn log_with_level(level: Level, method: &str, kind: &str, elapsed_us: u128, extra: &str) {

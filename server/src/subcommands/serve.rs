@@ -72,6 +72,7 @@ pub async fn run(config: &nodeget_lib::config::server::ServerConfig) {
             RpcTimingMiddleware {
                 service,
                 level: tracing::Level::TRACE,
+                _conn_guard: std::sync::Arc::new(crate::ws_counter::ConnectionGuard::new()),
             }
         });
 
