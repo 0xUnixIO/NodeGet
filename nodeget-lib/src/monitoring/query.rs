@@ -291,6 +291,26 @@ pub struct DynamicSummaryAvgQuery {
     pub points: u64,
 }
 
+// 批量历史查询：一次请求取多个节点的历史记录，避免 N 次串行请求
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DynamicSummaryHistoryMultiQuery {
+    pub uuids: Vec<uuid::Uuid>,
+    pub from: i64,
+    pub to: i64,
+    pub fields: Vec<DynamicSummaryQueryField>,
+}
+
+// 固定时间轴桶化查询：将 [from, to] 均分为 buckets 个桶，每桶含 COUNT 和字段 AVG
+// 空桶（离线期间）保留为 count=0、字段为 null，可正确渲染离线状态
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DynamicSummaryBucketsQuery {
+    pub uuid: uuid::Uuid,
+    pub from: i64,
+    pub to: i64,
+    pub buckets: u32,
+    pub fields: Vec<DynamicSummaryQueryField>,
+}
+
 // 动态监控摘要数据响应项结构体
 #[derive(Serialize)]
 pub struct DynamicSummaryResponseItem {

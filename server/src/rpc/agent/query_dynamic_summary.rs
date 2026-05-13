@@ -244,7 +244,7 @@ pub const fn field_to_column(
     }
 }
 
-async fn execute_query(
+pub async fn execute_query(
     db: &sea_orm::DatabaseConnection,
     query: Selector<SelectModel<serde_json::Value>>,
     capacity_hint: u64,
