@@ -474,7 +474,7 @@
     "headers": [
       {"name": "User-Agent", "value": "Mozilla/5.0"}
     ],
-    "body_bytes": []
+    "body_base64": ""
   }
   ```
 - 执行结果保存到数据库的是序列化的 HTTP Response 对象：
@@ -484,7 +484,7 @@
     "headers": [
       {"name": "content-type", "value": "image/png"}
     ],
-    "body_bytes": [137, 80, 78, 71, ...]
+    "body_base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
   }
   ```
 

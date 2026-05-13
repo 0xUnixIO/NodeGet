@@ -424,20 +424,20 @@ struct JsRouteInput {
     method: String,
     url: String,
     headers: Vec<JsRouteHeader>,
-    body_bytes: Vec<u8>,
-}
-
-#[derive(Debug, Deserialize)]
-struct JsRouteOutputHeader {
-    name: String,
-    value: String,
+    body_base64: String,
 }
 
 #[derive(Debug, Deserialize)]
 struct JsRouteOutput {
     status: u16,
     headers: Vec<JsRouteOutputHeader>,
-    body_bytes: Vec<u8>,
+    body_base64: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct JsRouteOutputHeader {
+    name: String,
+    value: String,
 }
 
 async fn handle_js_worker_route(
@@ -543,11 +543,12 @@ async fn handle_js_worker_route(
         );
     };
 
+    let body_base64 = base64::engine::general_purpose::STANDARD.encode(&body_bytes);
     let js_input = JsRouteInput {
         method,
         url,
         headers,
-        body_bytes,
+        body_base64,
     };
     let params = match serde_json::to_value(js_input) {
         Ok(v) => v,
@@ -613,8 +614,19 @@ async fn handle_js_worker_route(
         }
     }
 
+    let body_bytes = match base64::engine::general_purpose::STANDARD.decode(&js_output.body_base64) {
+        Ok(v) => v,
+        Err(e) => {
+            error!(target: "js_worker", route_name = %route_name, error = %e, "failed to decode base64 body");
+            return build_http_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to decode base64 body: {e}"),
+            );
+        }
+    };
+
     response
-        .body(jsonrpsee::server::HttpBody::from(js_output.body_bytes))
+        .body(jsonrpsee::server::HttpBody::from(body_bytes))
         .unwrap_or_else(|e| {
             error!(target: "js_worker", route_name = %route_name, error = %e, "failed to build HTTP response");
             build_http_error(

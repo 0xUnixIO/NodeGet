@@ -506,8 +506,8 @@ pub fn js_runner(
                             method: String(input.method ?? "GET"),
                             headers: routeHeaders
                         };
-                        if (Array.isArray(input.body_bytes) && input.body_bytes.length > 0) {
-                            routeInit.body = new Uint8Array(input.body_bytes);
+                        if (typeof input.body_base64 === 'string' && input.body_base64.length > 0) {
+                            routeInit.body = Uint8Array.from(atob(input.body_base64), c => c.charCodeAt(0));
                         }
 
                         const routeRequest = new Request(String(input.url ?? ""), routeInit);
@@ -522,7 +522,7 @@ pub fn js_runner(
                             status: routeResponse.status,
                             headers: Array.from(routeResponse.headers.entries())
                                 .map(([name, value]) => ({ name, value })),
-                            body_bytes: Array.from(routeBody)
+                            body_base64: btoa(String.fromCharCode(...routeBody))
                         };
                     }
 
@@ -759,8 +759,8 @@ pub fn js_runner_source_mode(
                             method: String(input.method ?? "GET"),
                             headers: routeHeaders
                         };
-                        if (Array.isArray(input.body_bytes) && input.body_bytes.length > 0) {
-                            routeInit.body = new Uint8Array(input.body_bytes);
+                        if (typeof input.body_base64 === 'string' && input.body_base64.length > 0) {
+                            routeInit.body = Uint8Array.from(atob(input.body_base64), c => c.charCodeAt(0));
                         }
 
                         const routeRequest = new Request(String(input.url ?? ""), routeInit);
@@ -775,7 +775,7 @@ pub fn js_runner_source_mode(
                             status: routeResponse.status,
                             headers: Array.from(routeResponse.headers.entries())
                                 .map(([name, value]) => ({ name, value })),
-                            body_bytes: Array.from(routeBody)
+                            body_base64: btoa(String.fromCharCode(...routeBody))
                         };
                     }
 
