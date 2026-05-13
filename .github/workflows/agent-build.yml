@@ -34,11 +34,10 @@ jobs:
           from datetime import datetime, timezone
           tag = os.environ.get('TAG', '')
           if tag.startswith('v') and len(tag) == 13:
-              v = tag[1:]
-              semver = f'{v[:8]}.{v[8:]}.0'
+              semver = f'{tag[1:]}.0.0'
           else:
               now = datetime.now(timezone.utc)
-              semver = f'{now.strftime("%Y%m%d")}.{now.strftime("%H%M")}.0'
+              semver = f'{now.strftime("%Y%m%d%H%M")}.0.0'
           for f in ['nodeget-lib/Cargo.toml', 'server/Cargo.toml', 'agent/Cargo.toml']:
               c = open(f).read()
               open(f, 'w').write(re.sub(r'^version = .+', f'version = "{semver}"', c, count=1, flags=re.M))
