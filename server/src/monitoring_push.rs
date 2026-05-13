@@ -18,11 +18,11 @@ use uuid::Uuid;
 /// - 增加了 `uuid: String`（全局订阅，需区分 agent）
 /// - `cpu_usage` / `gpu_usage` / `load_one` / `load_five` / `load_fifteen`
 ///   已做 descale（÷10），使用 `Option<f64>`
-/// - `time` 是有符号 i64（milliseconds，与 DB 返回一致）
+/// - `timestamp` 是有符号 i64（milliseconds，与 DB 返回一致）
 #[derive(Clone, Debug, Serialize)]
 pub struct DynamicSummaryEvent {
     pub uuid: String,
-    pub time: i64,
+    pub timestamp: i64,
     pub cpu_usage: Option<f64>,
     pub gpu_usage: Option<f64>,
     pub used_swap: Option<i64>,
@@ -53,10 +53,10 @@ impl DynamicSummaryEvent {
     ///
     /// `cpu_usage`、`gpu_usage`、`load_one`、`load_five`、`load_fifteen`
     /// 在数据库中均以 `i16 * 10` 存储，读取时需要除以 10 还原为真实浮点数。
-    pub fn from_data(uuid: Uuid, time: i64, data: &DynamicMonitoringSummaryData) -> Self {
+    pub fn from_data(uuid: Uuid, timestamp: i64, data: &DynamicMonitoringSummaryData) -> Self {
         Self {
             uuid: uuid.to_string(),
-            time,
+            timestamp,
             // *10 缩放字段：转换为 f64 并 ÷10
             cpu_usage: data.cpu_usage.map(|v| f64::from(v) / 10.0),
             gpu_usage: data.gpu_usage.map(|v| f64::from(v) / 10.0),
