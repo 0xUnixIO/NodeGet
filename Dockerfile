@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 ARG ALPINE_VERSION=3.22
-ARG RUST_IMAGE=rust:stable-alpine3.22
+ARG RUST_IMAGE=rust:alpine3.22
 
 FROM ${RUST_IMAGE} AS chef
 
