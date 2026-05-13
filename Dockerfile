@@ -54,7 +54,7 @@ FROM alpine:${ALPINE_VERSION} AS runtime-base
 
 LABEL org.opencontainers.image.title="NodeGet Server"
 LABEL org.opencontainers.image.description="NodeGet server runtime image based on Alpine Linux"
-LABEL org.opencontainers.image.source="https://github.com/GenshinMinecraft/NodeGet"
+LABEL org.opencontainers.image.source="https://github.com/wynn/NodeGet"
 LABEL org.opencontainers.image.licenses="AGPL-3.0"
 
 RUN apk add --no-cache ca-certificates tzdata \
@@ -83,4 +83,4 @@ COPY --from=release-binary /out/nodeget-server /usr/local/bin/nodeget-server
 FROM runtime-base AS runtime-source
 COPY --from=source-binary /out/nodeget-server /usr/local/bin/nodeget-server
 
-FROM runtime-release AS runtime
+FROM runtime-source AS runtime
