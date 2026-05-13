@@ -78,7 +78,7 @@ fn ts_to_date_str(ts: i64) -> String {
 /// 执行 raw SQL COUNT 查询，返回第一列第一行的 i64 值，出错返回 0
 async fn query_count(db: &DatabaseConnection, sql: &str) -> i64 {
     match db
-        .query_one(Statement::from_string(db.get_database_backend(), sql.to_owned()))
+        .query_one(&Statement::from_string(db.get_database_backend(), sql.to_owned()))
         .await
     {
         Ok(Some(row)) => row.try_get_by_index::<i64>(0).unwrap_or(0),
@@ -217,7 +217,7 @@ pub async fn aggregate_past_days(db: &DatabaseConnection) {
     };
 
     let rows = match db
-        .query_all(Statement::from_string(backend, group_sql))
+        .query_all(&Statement::from_string(backend, group_sql))
         .await
     {
         Ok(r) => r,
@@ -261,7 +261,7 @@ pub async fn aggregate_past_days(db: &DatabaseConnection) {
         };
 
         if let Err(e) = db
-            .execute(Statement::from_string(backend, upsert_sql))
+            .execute(&Statement::from_string(backend, upsert_sql))
             .await
         {
             error!(target: "visitor_stats", error = %e, date = %date, "upsert visit_daily_stats 失败");
@@ -273,7 +273,7 @@ pub async fn aggregate_past_days(db: &DatabaseConnection) {
         "DELETE FROM visit_log WHERE visited_at < {today_start}"
     );
     if let Err(e) = db
-        .execute(Statement::from_string(backend, delete_sql))
+        .execute(&Statement::from_string(backend, delete_sql))
         .await
     {
         error!(target: "visitor_stats", error = %e, "删除历史 visit_log 失败");
