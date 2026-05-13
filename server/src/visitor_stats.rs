@@ -4,7 +4,7 @@
 //! 后台任务每天 UTC 零点将 visit_log 中历史数据聚合到 visit_daily_stats。
 
 use axum::http::StatusCode;
-use sea_orm::{ActiveModelTrait, DatabaseBackend, DatabaseConnection, Set, Statement};
+use sea_orm::{ActiveModelTrait, ConnectionTrait, DatabaseBackend, DatabaseConnection, Set, Statement};
 use serde::Serialize;
 use tracing::error;
 
