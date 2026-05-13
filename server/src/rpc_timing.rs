@@ -10,7 +10,7 @@ pub struct RpcTimingMiddleware<S> {
     pub service: S,
     pub level: Level,
     /// 每条 WS 连接持有一份，连接断开（所有 clone 析构）时自动 -1
-    _conn_guard: Arc<ConnectionGuard>,
+    pub(crate) _conn_guard: Arc<ConnectionGuard>,
 }
 
 fn log_with_level(level: Level, method: &str, kind: &str, elapsed_us: u128, extra: &str) {
