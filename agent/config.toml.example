@@ -2,8 +2,8 @@
 # 如果你正在测试或遇到问题，请至少选择 debug
 log_level = "info"
 
-# 动态监控数据上报间隔（毫秒），默认 1000
-dynamic_report_interval_ms = 1000
+# 动态监控数据上报间隔（毫秒），默认 15000
+dynamic_report_interval_ms = 15000
 
 # 动态监控摘要数据上报间隔（毫秒），默认 1000
 # 必须是 dynamic_report_interval_ms 的因数

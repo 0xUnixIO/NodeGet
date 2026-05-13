@@ -1,50 +1,25 @@
 # syntax=docker/dockerfile:1
 
 ARG ALPINE_VERSION=3.22
-ARG RUST_IMAGE=rustlang/rust:nightly-alpine3.22
+ARG RUST_IMAGE=rust:alpine3.22
 
-FROM alpine:${ALPINE_VERSION} AS release-binary
+FROM ${RUST_IMAGE} AS chef
 
-ARG NODEGET_VERSION=latest
-ARG NODEGET_RELEASE_REPO=GenshinMinecraft/NodeGet
-ARG TARGETARCH
-ARG TARGETVARIANT
-
-RUN apk add --no-cache ca-certificates curl
-
-RUN set -eux; \
-    docker_target="${TARGETARCH}${TARGETVARIANT}"; \
-    if [ -z "${docker_target}" ]; then \
-        docker_target="$(apk --print-arch)"; \
-    fi; \
-    case "${docker_target}" in \
-        amd64* | x86_64) asset="nodeget-server-linux-x86_64-musl" ;; \
-        arm64* | aarch64) asset="nodeget-server-linux-aarch64-musl" ;; \
-        armv7) asset="nodeget-server-linux-armv7-musleabihf" ;; \
-        *) \
-            echo "Unsupported Docker target: ${docker_target}. Supported: linux/amd64, linux/arm64, linux/arm/v7" >&2; \
-            exit 1; \
-            ;; \
-    esac; \
-    if [ "${NODEGET_VERSION}" = "latest" ]; then \
-        release_path="latest/download"; \
-    else \
-        release_path="download/${NODEGET_VERSION}"; \
-    fi; \
-    mkdir -p /out; \
-    curl -fsSL --retry 5 --retry-delay 2 \
-        "https://github.com/${NODEGET_RELEASE_REPO}/releases/${release_path}/${asset}" \
-        -o /out/nodeget-server; \
-    chmod 0755 /out/nodeget-server
-
-FROM ${RUST_IMAGE} AS source-binary
+RUN apk add --no-cache build-base clang clang-dev git musl-dev pkgconf \
+    && cargo install cargo-chef --locked
 
 WORKDIR /src
 
-RUN apk add --no-cache build-base clang clang-dev git musl-dev pkgconf
+FROM chef AS planner
+COPY . .
+RUN cargo chef prepare --recipe-path recipe.json
+
+FROM chef AS source-binary
+
+COPY --from=planner /src/recipe.json recipe.json
+RUN cargo chef cook --profile minimal --recipe-path recipe.json
 
 COPY . .
-
 RUN cargo build --package nodeget-server --profile minimal --locked \
     && mkdir -p /out \
     && cp target/minimal/nodeget-server /out/nodeget-server \
@@ -54,11 +29,10 @@ FROM alpine:${ALPINE_VERSION} AS runtime-base
 
 LABEL org.opencontainers.image.title="NodeGet Server"
 LABEL org.opencontainers.image.description="NodeGet server runtime image based on Alpine Linux"
-LABEL org.opencontainers.image.source="https://github.com/GenshinMinecraft/NodeGet"
+LABEL org.opencontainers.image.source="https://github.com/wynn/NodeGet"
 LABEL org.opencontainers.image.licenses="AGPL-3.0"
 
 RUN apk add --no-cache ca-certificates tzdata \
-    && update-ca-certificates \
     && mkdir -p /etc/nodeget /var/lib/nodeget
 
 COPY docker/entrypoint.sh /usr/local/bin/nodeget-entrypoint
@@ -77,10 +51,7 @@ EXPOSE 2211
 ENTRYPOINT ["/usr/local/bin/nodeget-entrypoint"]
 CMD ["serve"]
 
-FROM runtime-base AS runtime-release
-COPY --from=release-binary /out/nodeget-server /usr/local/bin/nodeget-server
-
 FROM runtime-base AS runtime-source
 COPY --from=source-binary /out/nodeget-server /usr/local/bin/nodeget-server
 
-FROM runtime-release AS runtime
+FROM runtime-source AS runtime
