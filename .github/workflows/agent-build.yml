@@ -17,10 +17,12 @@ jobs:
             target: x86_64-unknown-linux-musl
             runner: ubuntu-latest
             binary_name: nodeget-agent-linux-x86_64-musl
+            use_cross: true
           - release_for: linux_aarch64_musl
             target: aarch64-unknown-linux-musl
             runner: ubuntu-24.04-arm
             binary_name: nodeget-agent-linux-aarch64-musl
+            use_cross: false
 
     runs-on: ${{ matrix.platform.runner }}
     steps:
@@ -52,15 +54,21 @@ jobs:
           components: clippy
 
       - name: Install Cross
+        if: matrix.platform.use_cross
         uses: taiki-e/install-action@v2
         with:
           tool: cross
 
+      - name: Add musl target (native build)
+        if: ${{ !matrix.platform.use_cross }}
+        run: rustup target add ${{ matrix.platform.target }}
+
       - name: Build binary
         working-directory: ./agent
-        run: cargo clean && cross build --target ${{ matrix.platform.target }} --profile minimal
+        run: cargo clean && ${{ matrix.platform.use_cross && 'cross' || 'cargo' }} build --target ${{ matrix.platform.target }} --profile minimal
         env:
           CROSS_NO_WARNINGS: 0
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
 
       - name: Compress binary
         if: ${{ !matrix.platform.no_upx }}
