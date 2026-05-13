@@ -123,10 +123,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Get version from nodeget-lib
+      - name: Get version
         id: version
         run: |
-          VERSION=$(grep '^version' nodeget-lib/Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
+          VERSION=$(date -u +"%Y%m%d%H%M")
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
 

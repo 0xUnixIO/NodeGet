@@ -48,8 +48,8 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/nodeget
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value={{date 'YYYYMMDDHHmm'}},enable={{is_default_branch}}
             type=ref,event=tag
-            type=sha,prefix=sha-,format=short
 
       - name: Build and push
         uses: docker/build-push-action@v6
