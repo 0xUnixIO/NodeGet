@@ -19,6 +19,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260415_000000_create_dynamic_monitoring_summary::Migration),
             Box::new(m20260509_000000_add_js_worker_limits::Migration),
             Box::new(m20260509_000001_create_static::Migration),
+            Box::new(m20260514_000000_create_visit_stats::Migration),
         ]
     }
 }
@@ -35,3 +36,4 @@ mod m20260328_033808_create_js_result;
 mod m20260415_000000_create_dynamic_monitoring_summary;
 mod m20260509_000000_add_js_worker_limits;
 mod m20260509_000001_create_static;
+mod m20260514_000000_create_visit_stats;

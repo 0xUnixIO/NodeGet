@@ -14,3 +14,5 @@ pub mod static_file;
 pub mod static_monitoring;
 pub mod task;
 pub mod token;
+pub mod visit_daily_stats;
+pub mod visit_log;

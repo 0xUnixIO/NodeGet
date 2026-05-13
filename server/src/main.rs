@@ -36,6 +36,7 @@ pub(crate) mod monitoring_last_cache;
 pub(crate) mod monitoring_push;
 mod subcommands;
 mod token;
+pub(crate) mod visitor_stats;
 
 // 全局数据库连接单例
 pub static DB: tokio::sync::OnceCell<sea_orm::DatabaseConnection> =
