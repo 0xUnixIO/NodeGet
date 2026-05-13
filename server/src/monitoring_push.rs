@@ -93,6 +93,8 @@ static GLOBAL_REGISTRY: OnceLock<Arc<DynamicPushRegistry>> = OnceLock::new();
 /// 全局动态监控推送注册表，维护所有活跃 WebSocket 订阅者的 sender。
 pub struct DynamicPushRegistry {
     subscribers: Arc<RwLock<HashMap<Uuid, mpsc::Sender<DynamicSummaryEvent>>>>,
+    /// 在线人数订阅者：每次 subscribers 增减时广播最新人数
+    viewer_count_subs: Arc<RwLock<HashMap<Uuid, mpsc::Sender<usize>>>>,
 }
 
 impl DynamicPushRegistry {
@@ -102,28 +104,56 @@ impl DynamicPushRegistry {
             .get_or_init(|| {
                 Arc::new(Self {
                     subscribers: Arc::new(RwLock::new(HashMap::new())),
+                    viewer_count_subs: Arc::new(RwLock::new(HashMap::new())),
                 })
             })
             .clone()
     }
 
-    /// 注册一个新订阅者。
+    /// 注册一个新动态摘要订阅者，并广播最新人数。
     pub async fn subscribe(&self, reg_id: Uuid, tx: mpsc::Sender<DynamicSummaryEvent>) {
-        let mut subs = self.subscribers.write().await;
-        subs.insert(reg_id, tx);
+        let count = {
+            let mut subs = self.subscribers.write().await;
+            subs.insert(reg_id, tx);
+            subs.len()
+        };
+        self.broadcast_viewer_count(count).await;
     }
 
-    /// 移除一个订阅者（WS 断开时调用）。
+    /// 移除一个动态摘要订阅者（WS 断开时调用），并广播最新人数。
     pub async fn unsubscribe(&self, reg_id: &Uuid) {
-        let mut subs = self.subscribers.write().await;
-        subs.remove(reg_id);
+        let count = {
+            let mut subs = self.subscribers.write().await;
+            subs.remove(reg_id);
+            subs.len()
+        };
+        self.broadcast_viewer_count(count).await;
     }
 
-    /// 向所有订阅者广播事件，channel 满时直接丢弃（不阻塞上报路径）。
+    /// 向所有订阅者广播动态摘要事件，channel 满时直接丢弃（不阻塞上报路径）。
     pub async fn broadcast(&self, event: DynamicSummaryEvent) {
         let subs = self.subscribers.read().await;
         for tx in subs.values() {
             let _ = tx.try_send(event.clone());
+        }
+    }
+
+    /// 注册在线人数订阅者，立即推送当前人数，之后随 subscribers 变化实时更新。
+    pub async fn subscribe_viewer_count(&self, reg_id: Uuid, tx: mpsc::Sender<usize>) {
+        let count = self.subscribers.read().await.len();
+        let _ = tx.try_send(count);
+        self.viewer_count_subs.write().await.insert(reg_id, tx);
+    }
+
+    /// 移除在线人数订阅者。
+    pub async fn unsubscribe_viewer_count(&self, reg_id: &Uuid) {
+        self.viewer_count_subs.write().await.remove(reg_id);
+    }
+
+    async fn broadcast_viewer_count(&self, count: usize) {
+        let subs = self.viewer_count_subs.read().await;
+        for tx in subs.values() {
+            let _ = tx.try_send(count);
         }
     }
 }

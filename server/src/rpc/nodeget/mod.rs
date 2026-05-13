@@ -1,3 +1,4 @@
+use crate::monitoring_push::DynamicPushRegistry;
 use crate::rpc::RpcHelper;
 use crate::rpc::{rpc_exec, token_identity};
 use crate::{RELOAD_NOTIFY, SERVER_CONFIG, SERVER_CONFIG_PATH};
@@ -10,6 +11,7 @@ use nodeget_lib::permission::token_auth::TokenOrAuth;
 use nodeget_lib::utils::version::NodeGetVersion;
 use serde_json::Value;
 use serde_json::value::RawValue;
+use tokio::sync::mpsc;
 use tracing::Instrument;
 use uuid::Uuid;
 
@@ -53,6 +55,13 @@ pub trait Rpc {
 
     #[method(name = "active_connections")]
     async fn active_connections(&self) -> usize;
+
+    #[subscription(
+        name = "subscribe_viewer_count",
+        item = usize,
+        unsubscribe = "unsubscribe_viewer_count"
+    )]
+    async fn subscribe_viewer_count(&self, token: String) -> SubscriptionResult;
 }
 
 #[derive(Clone)]
@@ -255,6 +264,36 @@ impl RpcServer for NodegetServerRpcImpl {
 
     async fn active_connections(&self) -> usize {
         crate::ws_counter::get()
+    }
+
+    async fn subscribe_viewer_count(
+        &self,
+        subscription_sink: PendingSubscriptionSink,
+        _token: String,
+    ) -> SubscriptionResult {
+        let sink = subscription_sink.accept().await?;
+        let (tx, mut rx) = mpsc::channel::<usize>(16);
+        let reg_id = Uuid::new_v4();
+
+        DynamicPushRegistry::global()
+            .subscribe_viewer_count(reg_id, tx)
+            .await;
+
+        tokio::spawn(async move {
+            while let Some(count) = rx.recv().await {
+                let Ok(raw) = RawValue::from_string(count.to_string()) else {
+                    break;
+                };
+                if sink.send(SubscriptionMessage::from(raw)).await.is_err() {
+                    break;
+                }
+            }
+            DynamicPushRegistry::global()
+                .unsubscribe_viewer_count(&reg_id)
+                .await;
+        });
+
+        Ok(())
     }
 
     async fn self_update(&self, token: String, tag: String) -> RpcResult<()> {
