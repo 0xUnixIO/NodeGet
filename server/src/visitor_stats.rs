@@ -9,23 +9,25 @@ use tracing::error;
 use crate::entity::{visit_daily_stats, visit_log};
 
 #[derive(Serialize)]
-struct DailyPoint {
-    date: String,
-    pv: u64,
-    uv: u64,
+pub struct DailyPoint {
+    pub date: String,
+    pub pv: u64,
+    pub uv: u64,
 }
 
 #[derive(Serialize)]
-struct VisitorStatsResponse {
-    today_rank: u64,
-    today_pv: u64,
-    today_uv: u64,
-    all_time_pv: u64,
-    all_time_uv: u64,
-    yesterday_pv: u64,
-    yesterday_uv: u64,
+pub struct VisitorStatsResponse {
+    pub today_rank: u64,
+    pub today_pv: u64,
+    pub today_uv: u64,
+    pub all_time_pv: u64,
+    pub all_time_uv: u64,
+    pub yesterday_pv: u64,
+    pub yesterday_uv: u64,
     /// 最近 14 天（含今日）的每日数据，按日期升序
-    history: Vec<DailyPoint>,
+    pub history: Vec<DailyPoint>,
+    /// 当前在线人数（动态摘要订阅者数）
+    pub online_viewers: u64,
 }
 
 /// X-Real-IP → X-Forwarded-For → ConnectInfo 三级降级，并验证 IP 格式防止头部伪造污染数据
@@ -72,48 +74,9 @@ fn ts_to_date_str(ts: i64) -> String {
         .unwrap_or_else(|| "1970-01-01".to_owned())
 }
 
-pub async fn handler(
-    req: axum::extract::Request,
-) -> axum::http::Response<jsonrpsee::server::HttpBody> {
-    if req.method() == axum::http::Method::OPTIONS {
-        return axum::http::Response::builder()
-            .status(StatusCode::NO_CONTENT)
-            .header(axum::http::header::ACCESS_CONTROL_ALLOW_ORIGIN, "*")
-            .header(axum::http::header::ACCESS_CONTROL_ALLOW_METHODS, "GET, OPTIONS")
-            .header(axum::http::header::ACCESS_CONTROL_ALLOW_HEADERS, "*")
-            .body(jsonrpsee::server::HttpBody::default())
-            .expect("构建 CORS 响应失败");
-    }
-
-    let Some(db) = crate::DB.get() else {
-        error!(target: "visitor_stats", "数据库未初始化");
-        return build_error(StatusCode::INTERNAL_SERVER_ERROR, "数据库未初始化");
-    };
-
-    let ip = extract_ip(&req);
-    let now_ts = chrono::Utc::now().timestamp();
+/// 纯计算访客统计数据，不记录访问，不广播。DB 错误时返回 None。
+pub async fn compute_stats(db: &DatabaseConnection) -> Option<VisitorStatsResponse> {
     let today_start = today_utc_start_ts();
-
-    // 5分钟内同 IP 去重：超过 5 分钟才算新 PV
-    let five_min_ago = now_ts - 300;
-    let recent_count = visit_log::Entity::find()
-        .filter(visit_log::Column::Ip.eq(&ip))
-        .filter(visit_log::Column::VisitedAt.gte(five_min_ago))
-        .count(db)
-        .await
-        .unwrap_or(0);
-
-    if recent_count == 0 {
-        let new_visit = visit_log::ActiveModel {
-            ip: Set(ip),
-            visited_at: Set(now_ts),
-            ..Default::default()
-        };
-        if let Err(e) = new_visit.insert(db).await {
-            error!(target: "visitor_stats", error = %e, "插入 visit_log 失败");
-            return build_error(StatusCode::INTERNAL_SERVER_ERROR, "记录访问失败");
-        }
-    }
 
     // 今日所有记录，用于计算 PV / UV
     let today_records = match visit_log::Entity::find()
@@ -124,7 +87,7 @@ pub async fn handler(
         Ok(v) => v,
         Err(e) => {
             error!(target: "visitor_stats", error = %e, "查询今日 visit_log 失败");
-            return build_error(StatusCode::INTERNAL_SERVER_ERROR, "查询失败");
+            return None;
         }
     };
 
@@ -203,7 +166,11 @@ pub async fn handler(
         uv: today_uv,
     });
 
-    let resp = VisitorStatsResponse {
+    let online_viewers = crate::monitoring_push::DynamicPushRegistry::global()
+        .online_viewers()
+        .await as u64;
+
+    Some(VisitorStatsResponse {
         today_rank,
         today_pv,
         today_uv,
@@ -212,23 +179,75 @@ pub async fn handler(
         yesterday_pv,
         yesterday_uv,
         history,
-    };
+        online_viewers,
+    })
+}
 
-    match serde_json::to_string(&resp) {
-        Ok(body) => axum::http::Response::builder()
-            .status(StatusCode::OK)
-            .header(
-                axum::http::header::CONTENT_TYPE,
-                "application/json; charset=utf-8",
-            )
-            .header(axum::http::header::ACCESS_CONTROL_ALLOW_ORIGIN, "*")
-            .body(jsonrpsee::server::HttpBody::from(body))
-            .expect("构建响应失败"),
-        Err(e) => {
-            error!(target: "visitor_stats", error = %e, "序列化响应失败");
-            build_error(StatusCode::INTERNAL_SERVER_ERROR, "序列化失败")
+/// 记录一次访问（5分钟内同 IP 去重），然后计算统计数据并广播给所有 WS 订阅者。
+pub async fn record_and_broadcast(db: &DatabaseConnection, ip: String) {
+    let now_ts = chrono::Utc::now().timestamp();
+    let five_min_ago = now_ts - 300;
+
+    let recent_count = visit_log::Entity::find()
+        .filter(visit_log::Column::Ip.eq(&ip))
+        .filter(visit_log::Column::VisitedAt.gte(five_min_ago))
+        .count(db)
+        .await
+        .unwrap_or(0);
+
+    if recent_count == 0 {
+        let new_visit = visit_log::ActiveModel {
+            ip: Set(ip),
+            visited_at: Set(now_ts),
+            ..Default::default()
+        };
+        if let Err(e) = new_visit.insert(db).await {
+            error!(target: "visitor_stats", error = %e, "插入 visit_log 失败");
+            return;
         }
     }
+
+    if let Some(stats) = compute_stats(db).await {
+        if let Ok(json_val) = serde_json::to_value(&stats) {
+            crate::monitoring_push::DynamicPushRegistry::global()
+                .broadcast_visitor_stats(&json_val)
+                .await;
+        }
+    }
+}
+
+/// HTTP POST `/nodeget/record-visit` 处理器：记录访问并返回 204 No Content。
+pub async fn record_handler(
+    req: axum::extract::Request,
+) -> axum::http::Response<jsonrpsee::server::HttpBody> {
+    if req.method() == axum::http::Method::OPTIONS {
+        return axum::http::Response::builder()
+            .status(StatusCode::NO_CONTENT)
+            .header(axum::http::header::ACCESS_CONTROL_ALLOW_ORIGIN, "*")
+            .header(axum::http::header::ACCESS_CONTROL_ALLOW_METHODS, "POST, OPTIONS")
+            .header(axum::http::header::ACCESS_CONTROL_ALLOW_HEADERS, "*")
+            .body(jsonrpsee::server::HttpBody::default())
+            .expect("构建 CORS 响应失败");
+    }
+
+    let Some(db) = crate::DB.get() else {
+        error!(target: "visitor_stats", "数据库未初始化");
+        return build_error(StatusCode::INTERNAL_SERVER_ERROR, "数据库未初始化");
+    };
+
+    let ip = extract_ip(&req);
+
+    // 异步记录并广播，不阻塞响应
+    let db_clone = db.clone();
+    tokio::spawn(async move {
+        record_and_broadcast(&db_clone, ip).await;
+    });
+
+    axum::http::Response::builder()
+        .status(StatusCode::NO_CONTENT)
+        .header(axum::http::header::ACCESS_CONTROL_ALLOW_ORIGIN, "*")
+        .body(jsonrpsee::server::HttpBody::default())
+        .expect("构建 204 响应失败")
 }
 
 /// 聚合 visit_log 中今天之前的数据到 visit_daily_stats，然后删除已聚合记录

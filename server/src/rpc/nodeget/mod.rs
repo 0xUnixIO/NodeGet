@@ -62,6 +62,13 @@ pub trait Rpc {
         unsubscribe = "unsubscribe_viewer_count"
     )]
     async fn subscribe_viewer_count(&self, token: String) -> SubscriptionResult;
+
+    #[subscription(
+        name = "subscribe_visitor_stats",
+        item = Value,
+        unsubscribe = "unsubscribe_visitor_stats"
+    )]
+    async fn subscribe_visitor_stats(&self) -> SubscriptionResult;
 }
 
 #[derive(Clone)]
@@ -290,6 +297,49 @@ impl RpcServer for NodegetServerRpcImpl {
             }
             DynamicPushRegistry::global()
                 .unsubscribe_viewer_count(&reg_id)
+                .await;
+        });
+
+        Ok(())
+    }
+
+    async fn subscribe_visitor_stats(
+        &self,
+        subscription_sink: PendingSubscriptionSink,
+    ) -> SubscriptionResult {
+        let sink = subscription_sink.accept().await?;
+        let (tx, mut rx) = mpsc::channel::<Value>(16);
+        let reg_id = Uuid::new_v4();
+
+        // 立即推送当前统计数据
+        if let Some(db) = crate::DB.get() {
+            if let Some(stats) = crate::visitor_stats::compute_stats(db).await {
+                if let Ok(json_str) = serde_json::to_string(&stats) {
+                    if let Ok(raw) = RawValue::from_string(json_str) {
+                        let _ = sink.send(SubscriptionMessage::from(raw)).await;
+                    }
+                }
+            }
+        }
+
+        DynamicPushRegistry::global()
+            .subscribe_visitor_stats(reg_id, tx)
+            .await;
+
+        tokio::spawn(async move {
+            while let Some(val) = rx.recv().await {
+                let Ok(json_str) = serde_json::to_string(&val) else {
+                    break;
+                };
+                let Ok(raw) = RawValue::from_string(json_str) else {
+                    break;
+                };
+                if sink.send(SubscriptionMessage::from(raw)).await.is_err() {
+                    break;
+                }
+            }
+            DynamicPushRegistry::global()
+                .unsubscribe_visitor_stats(&reg_id)
                 .await;
         });
 

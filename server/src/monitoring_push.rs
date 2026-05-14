@@ -7,6 +7,7 @@
 
 use nodeget_lib::monitoring::data_structure::DynamicMonitoringSummaryData;
 use serde::Serialize;
+use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::{Arc, OnceLock};
 use tokio::sync::{RwLock, mpsc};
@@ -93,24 +94,34 @@ static GLOBAL_REGISTRY: OnceLock<Arc<DynamicPushRegistry>> = OnceLock::new();
 /// 全局动态监控推送注册表，维护所有活跃 WebSocket 订阅者的 sender。
 pub struct DynamicPushRegistry {
     subscribers: Arc<RwLock<HashMap<Uuid, mpsc::Sender<DynamicSummaryEvent>>>>,
-    /// 在线人数订阅者：每次 subscribers 增减时广播最新人数
+    /// 在线人数订阅者（保留向后兼容）
     viewer_count_subs: Arc<RwLock<HashMap<Uuid, mpsc::Sender<usize>>>>,
+    /// 访客统计订阅者：记录新访问或在线人数变化时广播
+    visitor_stats_subs: Arc<RwLock<HashMap<Uuid, mpsc::Sender<Value>>>>,
+    /// 最新访客统计 JSON 缓存，用于在线人数变化时直接更新 online_viewers 再广播
+    latest_visitor_stats: Arc<RwLock<Option<Value>>>,
 }
 
 impl DynamicPushRegistry {
-    /// 获取全局单例，不存在时自动初始化。
     pub fn global() -> Arc<Self> {
         GLOBAL_REGISTRY
             .get_or_init(|| {
                 Arc::new(Self {
                     subscribers: Arc::new(RwLock::new(HashMap::new())),
                     viewer_count_subs: Arc::new(RwLock::new(HashMap::new())),
+                    visitor_stats_subs: Arc::new(RwLock::new(HashMap::new())),
+                    latest_visitor_stats: Arc::new(RwLock::new(None)),
                 })
             })
             .clone()
     }
 
-    /// 注册一个新动态摘要订阅者，并广播最新人数。
+    /// 返回当前动态摘要订阅者数（即"在线人数"）
+    pub async fn online_viewers(&self) -> usize {
+        self.subscribers.read().await.len()
+    }
+
+    /// 注册动态摘要订阅者，并广播最新在线人数（含访客统计更新）。
     pub async fn subscribe(&self, reg_id: Uuid, tx: mpsc::Sender<DynamicSummaryEvent>) {
         let count = {
             let mut subs = self.subscribers.write().await;
@@ -120,7 +131,7 @@ impl DynamicPushRegistry {
         self.broadcast_viewer_count(count).await;
     }
 
-    /// 移除一个动态摘要订阅者（WS 断开时调用），并广播最新人数。
+    /// 移除动态摘要订阅者，并广播最新在线人数（含访客统计更新）。
     pub async fn unsubscribe(&self, reg_id: &Uuid) {
         let count = {
             let mut subs = self.subscribers.write().await;
@@ -130,7 +141,7 @@ impl DynamicPushRegistry {
         self.broadcast_viewer_count(count).await;
     }
 
-    /// 向所有订阅者广播动态摘要事件，channel 满时直接丢弃（不阻塞上报路径）。
+    /// 向所有动态摘要订阅者广播事件。
     pub async fn broadcast(&self, event: DynamicSummaryEvent) {
         let subs = self.subscribers.read().await;
         for tx in subs.values() {
@@ -138,22 +149,62 @@ impl DynamicPushRegistry {
         }
     }
 
-    /// 注册在线人数订阅者，立即推送当前人数，之后随 subscribers 变化实时更新。
+    /// 注册在线人数订阅者（向后兼容）。
     pub async fn subscribe_viewer_count(&self, reg_id: Uuid, tx: mpsc::Sender<usize>) {
         let count = self.subscribers.read().await.len();
         let _ = tx.try_send(count);
         self.viewer_count_subs.write().await.insert(reg_id, tx);
     }
 
-    /// 移除在线人数订阅者。
     pub async fn unsubscribe_viewer_count(&self, reg_id: &Uuid) {
         self.viewer_count_subs.write().await.remove(reg_id);
     }
 
+    /// 在线人数变化时：推送给 viewer_count_subs，并将 online_viewers 字段注入
+    /// 缓存的访客统计后广播给 visitor_stats_subs，无需重查 DB。
     async fn broadcast_viewer_count(&self, count: usize) {
-        let subs = self.viewer_count_subs.read().await;
+        // 旧订阅者
+        {
+            let subs = self.viewer_count_subs.read().await;
+            for tx in subs.values() {
+                let _ = tx.try_send(count);
+            }
+        }
+        // 更新缓存并广播给访客统计订阅者
+        let updated = {
+            let guard = self.latest_visitor_stats.read().await;
+            guard.as_ref().map(|v| {
+                let mut updated = v.clone();
+                if let Some(obj) = updated.as_object_mut() {
+                    obj.insert("online_viewers".to_string(), serde_json::json!(count));
+                }
+                updated
+            })
+        };
+        if let Some(stats) = updated {
+            *self.latest_visitor_stats.write().await = Some(stats.clone());
+            let subs = self.visitor_stats_subs.read().await;
+            for tx in subs.values() {
+                let _ = tx.try_send(stats.clone());
+            }
+        }
+    }
+
+    /// 注册访客统计订阅者。
+    pub async fn subscribe_visitor_stats(&self, reg_id: Uuid, tx: mpsc::Sender<Value>) {
+        self.visitor_stats_subs.write().await.insert(reg_id, tx);
+    }
+
+    pub async fn unsubscribe_visitor_stats(&self, reg_id: &Uuid) {
+        self.visitor_stats_subs.write().await.remove(reg_id);
+    }
+
+    /// 广播访客统计，同时更新缓存（用于后续在线人数变化时的增量广播）。
+    pub async fn broadcast_visitor_stats(&self, stats: &Value) {
+        *self.latest_visitor_stats.write().await = Some(stats.clone());
+        let subs = self.visitor_stats_subs.read().await;
         for tx in subs.values() {
-            let _ = tx.try_send(count);
+            let _ = tx.try_send(stats.clone());
         }
     }
 }

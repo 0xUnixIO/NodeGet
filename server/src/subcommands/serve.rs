@@ -225,9 +225,9 @@ pub async fn run(config: &nodeget_lib::config::server::ServerConfig) {
                 ),
             )
             .route(
-                "/nodeget/visitor-stats",
+                "/nodeget/record-visit",
                 any(|req: axum::extract::Request| async move {
-                    crate::visitor_stats::handler(req).await
+                    crate::visitor_stats::record_handler(req).await
                 }),
             )
             .route("/terminal", any(crate::terminal::terminal_ws_handler))
