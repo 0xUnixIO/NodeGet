@@ -11,19 +11,22 @@ use crate::entity::{visit_daily_stats, visit_log};
 #[derive(Serialize)]
 struct VisitorStatsResponse {
     today_rank: u64,
-    today_total: u64,
-    all_time_total: u64,
-    yesterday_total: u64,
+    today_pv: u64,
+    today_uv: u64,
+    all_time_pv: u64,
+    all_time_uv: u64,
+    yesterday_pv: u64,
+    yesterday_uv: u64,
 }
 
-/// X-Real-IP → X-Forwarded-For → ConnectInfo 三级降级
+/// X-Real-IP → X-Forwarded-For → ConnectInfo 三级降级，并验证 IP 格式防止头部伪造污染数据
 fn extract_ip(req: &axum::extract::Request) -> String {
     if let Some(ip) = req
         .headers()
         .get("x-real-ip")
         .and_then(|v| v.to_str().ok())
         .map(|s| s.trim().to_owned())
-        .filter(|s| !s.is_empty())
+        .filter(|s| s.parse::<std::net::IpAddr>().is_ok())
     {
         return ip;
     }
@@ -33,7 +36,7 @@ fn extract_ip(req: &axum::extract::Request) -> String {
         .and_then(|v| v.to_str().ok())
     {
         let first = forwarded.split(',').next().unwrap_or("").trim();
-        if !first.is_empty() {
+        if first.parse::<std::net::IpAddr>().is_ok() {
             return first.to_owned();
         }
     }
@@ -80,64 +83,108 @@ pub async fn handler(
 
     let ip = extract_ip(&req);
     let now_ts = chrono::Utc::now().timestamp();
-
-    // 用 ActiveModel 插入，避免 SQL 注入
-    let new_visit = visit_log::ActiveModel {
-        ip: Set(ip),
-        visited_at: Set(now_ts),
-        ..Default::default()
-    };
-    if let Err(e) = new_visit.insert(db).await {
-        error!(target: "visitor_stats", error = %e, "插入 visit_log 失败");
-        return build_error(StatusCode::INTERNAL_SERVER_ERROR, "记录访问失败");
-    }
-
     let today_start = today_utc_start_ts();
-    let yesterday_start = today_start - 86400;
 
-    // 今日排名 = 今日总访问量（插入后的计数）
-    let today_total = visit_log::Entity::find()
-        .filter(visit_log::Column::VisitedAt.gte(today_start))
+    // 5分钟内同 IP 去重：超过 5 分钟才算新 PV
+    let five_min_ago = now_ts - 300;
+    let recent_count = visit_log::Entity::find()
+        .filter(visit_log::Column::Ip.eq(&ip))
+        .filter(visit_log::Column::VisitedAt.gte(five_min_ago))
         .count(db)
         .await
         .unwrap_or(0);
 
-    // 全部历史：visit_daily_stats 总和 + visit_log 全部记录（两者不重叠）
+    if recent_count == 0 {
+        let new_visit = visit_log::ActiveModel {
+            ip: Set(ip),
+            visited_at: Set(now_ts),
+            ..Default::default()
+        };
+        if let Err(e) = new_visit.insert(db).await {
+            error!(target: "visitor_stats", error = %e, "插入 visit_log 失败");
+            return build_error(StatusCode::INTERNAL_SERVER_ERROR, "记录访问失败");
+        }
+    }
+
+    // 今日所有记录，用于计算 PV / UV
+    let today_records = match visit_log::Entity::find()
+        .filter(visit_log::Column::VisitedAt.gte(today_start))
+        .all(db)
+        .await
+    {
+        Ok(v) => v,
+        Err(e) => {
+            error!(target: "visitor_stats", error = %e, "查询今日 visit_log 失败");
+            return build_error(StatusCode::INTERNAL_SERVER_ERROR, "查询失败");
+        }
+    };
+
+    let today_pv = today_records.len() as u64;
+    let today_uv = today_records
+        .iter()
+        .map(|r| r.ip.as_str())
+        .collect::<std::collections::HashSet<_>>()
+        .len() as u64;
+    let today_rank = today_pv;
+
+    // 历史聚合数据（今天之前）
     let all_daily = visit_daily_stats::Entity::find()
         .all(db)
         .await
         .unwrap_or_default();
-    let daily_sum: i64 = all_daily.iter().map(|m| m.total_count).sum();
-    let log_total = visit_log::Entity::find().count(db).await.unwrap_or(0) as i64;
-    let all_time_total = (daily_sum + log_total).max(0) as u64;
+    let daily_pv_sum: i64 = all_daily.iter().map(|m| m.total_count).sum();
+    let daily_uv_sum: i64 = all_daily.iter().map(|m| m.uv_count).sum();
 
-    // 昨日：优先查 daily_stats，不存在则查 visit_log（尚未聚合时）
+    // 全部 visit_log 记录数（聚合未运行时可能含今天之前的数据）
+    let log_total = visit_log::Entity::find().count(db).await.unwrap_or(0) as i64;
+    let all_time_pv = (daily_pv_sum + log_total).max(0) as u64;
+    let all_time_uv = (daily_uv_sum + today_uv as i64).max(0) as u64;
+
+    // 昨日统计
+    let yesterday_start = today_start - 86400;
     let yesterday_date = ts_to_date_str(yesterday_start);
-    let yesterday_total = match visit_daily_stats::Entity::find_by_id(&yesterday_date)
-        .one(db)
-        .await
-        .unwrap_or(None)
-    {
-        Some(m) => m.total_count.max(0) as u64,
-        None => visit_log::Entity::find()
-            .filter(visit_log::Column::VisitedAt.gte(yesterday_start))
-            .filter(visit_log::Column::VisitedAt.lt(today_start))
-            .count(db)
+    let (yesterday_pv, yesterday_uv) =
+        match visit_daily_stats::Entity::find_by_id(&yesterday_date)
+            .one(db)
             .await
-            .unwrap_or(0),
-    };
+            .unwrap_or(None)
+        {
+            Some(m) => (m.total_count.max(0) as u64, m.uv_count.max(0) as u64),
+            None => {
+                // 聚合任务尚未运行时从 visit_log 实时计算
+                let yesterday_records = visit_log::Entity::find()
+                    .filter(visit_log::Column::VisitedAt.gte(yesterday_start))
+                    .filter(visit_log::Column::VisitedAt.lt(today_start))
+                    .all(db)
+                    .await
+                    .unwrap_or_default();
+                let pv = yesterday_records.len() as u64;
+                let uv = yesterday_records
+                    .iter()
+                    .map(|r| r.ip.as_str())
+                    .collect::<std::collections::HashSet<_>>()
+                    .len() as u64;
+                (pv, uv)
+            }
+        };
 
     let resp = VisitorStatsResponse {
-        today_rank: today_total,
-        today_total,
-        all_time_total,
-        yesterday_total,
+        today_rank,
+        today_pv,
+        today_uv,
+        all_time_pv,
+        all_time_uv,
+        yesterday_pv,
+        yesterday_uv,
     };
 
     match serde_json::to_string(&resp) {
         Ok(body) => axum::http::Response::builder()
             .status(StatusCode::OK)
-            .header(axum::http::header::CONTENT_TYPE, "application/json; charset=utf-8")
+            .header(
+                axum::http::header::CONTENT_TYPE,
+                "application/json; charset=utf-8",
+            )
             .header(axum::http::header::ACCESS_CONTROL_ALLOW_ORIGIN, "*")
             .body(jsonrpsee::server::HttpBody::from(body))
             .expect("构建响应失败"),
@@ -168,19 +215,29 @@ pub async fn aggregate_past_days(db: &DatabaseConnection) {
         return;
     }
 
-    // 在 Rust 中按日期分组计数，避免数据库方言差异
-    let mut date_counts: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
+    // 按日期分组：(pv_count, ip_set)
+    let mut date_counts: std::collections::HashMap<
+        String,
+        (i64, std::collections::HashSet<String>),
+    > = std::collections::HashMap::new();
     for visit in &old_visits {
-        *date_counts.entry(ts_to_date_str(visit.visited_at)).or_insert(0) += 1;
+        let entry = date_counts
+            .entry(ts_to_date_str(visit.visited_at))
+            .or_default();
+        entry.0 += 1;
+        entry.1.insert(visit.ip.clone());
     }
 
-    // 逐日 upsert 到 visit_daily_stats
-    for (date, cnt) in date_counts {
+    // 逐日 upsert
+    for (date, (pv_cnt, uv_set)) in date_counts {
+        let uv_cnt = uv_set.len() as i64;
         match visit_daily_stats::Entity::find_by_id(&date).one(db).await {
             Ok(Some(model)) => {
-                let new_count = model.total_count + cnt;
+                let new_total = model.total_count + pv_cnt;
+                let new_uv = model.uv_count + uv_cnt;
                 let mut active: visit_daily_stats::ActiveModel = model.into();
-                active.total_count = Set(new_count);
+                active.total_count = Set(new_total);
+                active.uv_count = Set(new_uv);
                 if let Err(e) = active.update(db).await {
                     error!(target: "visitor_stats", error = %e, date = %date, "更新 daily_stats 失败");
                 }
@@ -188,7 +245,8 @@ pub async fn aggregate_past_days(db: &DatabaseConnection) {
             Ok(None) => {
                 let new_stat = visit_daily_stats::ActiveModel {
                     date: Set(date.clone()),
-                    total_count: Set(cnt),
+                    total_count: Set(pv_cnt),
+                    uv_count: Set(uv_cnt),
                 };
                 if let Err(e) = new_stat.insert(db).await {
                     error!(target: "visitor_stats", error = %e, date = %date, "插入 daily_stats 失败");
@@ -200,7 +258,7 @@ pub async fn aggregate_past_days(db: &DatabaseConnection) {
         }
     }
 
-    // 删除已聚合的 visit_log 记录
+    // 删除已聚合的记录
     if let Err(e) = visit_log::Entity::delete_many()
         .filter(visit_log::Column::VisitedAt.lt(today_start))
         .exec(db)
@@ -216,7 +274,10 @@ fn build_error(
 ) -> axum::http::Response<jsonrpsee::server::HttpBody> {
     axum::http::Response::builder()
         .status(status)
-        .header(axum::http::header::CONTENT_TYPE, "text/plain; charset=utf-8")
+        .header(
+            axum::http::header::CONTENT_TYPE,
+            "text/plain; charset=utf-8",
+        )
         .header(axum::http::header::ACCESS_CONTROL_ALLOW_ORIGIN, "*")
         .body(jsonrpsee::server::HttpBody::from(message.to_owned()))
         .expect("构建错误响应失败")
