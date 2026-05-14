@@ -9,6 +9,13 @@ use tracing::error;
 use crate::entity::{visit_daily_stats, visit_log};
 
 #[derive(Serialize)]
+struct DailyPoint {
+    date: String,
+    pv: u64,
+    uv: u64,
+}
+
+#[derive(Serialize)]
 struct VisitorStatsResponse {
     today_rank: u64,
     today_pv: u64,
@@ -17,6 +24,8 @@ struct VisitorStatsResponse {
     all_time_uv: u64,
     yesterday_pv: u64,
     yesterday_uv: u64,
+    /// 最近 14 天（含今日）的每日数据，按日期升序
+    history: Vec<DailyPoint>,
 }
 
 /// X-Real-IP → X-Forwarded-For → ConnectInfo 三级降级，并验证 IP 格式防止头部伪造污染数据
@@ -168,6 +177,32 @@ pub async fn handler(
             }
         };
 
+    // 最近 14 天趋势：从 all_daily 中取，按日期升序排列，最后追加今日
+    let today_date = ts_to_date_str(today_start);
+    let mut history: Vec<DailyPoint> = {
+        let mut days: Vec<_> = all_daily
+            .iter()
+            .filter(|m| m.date != today_date)
+            .map(|m| DailyPoint {
+                date: m.date.clone(),
+                pv: m.total_count.max(0) as u64,
+                uv: m.uv_count.max(0) as u64,
+            })
+            .collect();
+        days.sort_by(|a, b| a.date.cmp(&b.date));
+        // 保留最近 13 天历史，加上今日共 14 天
+        let len = days.len();
+        if len > 13 {
+            days.drain(..len - 13);
+        }
+        days
+    };
+    history.push(DailyPoint {
+        date: today_date,
+        pv: today_pv,
+        uv: today_uv,
+    });
+
     let resp = VisitorStatsResponse {
         today_rank,
         today_pv,
@@ -176,6 +211,7 @@ pub async fn handler(
         all_time_uv,
         yesterday_pv,
         yesterday_uv,
+        history,
     };
 
     match serde_json::to_string(&resp) {
