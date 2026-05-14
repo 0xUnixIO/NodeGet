@@ -11,7 +11,8 @@ use nodeget_lib::monitoring::data_structure::{
 };
 use nodeget_lib::monitoring::query::{
     DynamicDataAvgQuery, DynamicDataQuery, DynamicDataQueryField, DynamicSummaryAvgQuery,
-    DynamicSummaryBucketsQuery, DynamicSummaryHistoryMultiQuery, DynamicSummaryQuery,
+    DynamicSummaryBucketsMultiQuery, DynamicSummaryBucketsQuery, DynamicSummaryHistoryMultiQuery,
+    DynamicSummaryQuery,
     DynamicSummaryQueryField, QueryCondition, StaticDataAvgQuery, StaticDataQuery,
     StaticDataQueryField,
 };
@@ -34,6 +35,7 @@ mod query_dynamic_multi_last;
 pub mod query_dynamic_summary;
 mod query_dynamic_summary_avg;
 mod query_dynamic_summary_buckets;
+mod query_dynamic_summary_buckets_multi;
 mod query_dynamic_summary_history_multi;
 mod query_dynamic_summary_multi_last;
 mod query_static;
@@ -156,6 +158,13 @@ pub trait Rpc {
         &self,
         token: String,
         query: DynamicSummaryBucketsQuery,
+    ) -> RpcResult<Box<RawValue>>;
+
+    #[method(name = "query_dynamic_summary_buckets_multi")]
+    async fn query_dynamic_summary_buckets_multi(
+        &self,
+        token: String,
+        query: DynamicSummaryBucketsMultiQuery,
     ) -> RpcResult<Box<RawValue>>;
 
     #[method(name = "dynamic_summary_multi_last_query")]
@@ -390,6 +399,25 @@ impl RpcServer for AgentRpcImpl {
         async {
             rpc_exec!(
                 query_dynamic_summary_buckets::query_dynamic_summary_buckets(token, query).await
+            )
+        }
+        .instrument(span)
+        .await
+    }
+
+    async fn query_dynamic_summary_buckets_multi(
+        &self,
+        token: String,
+        query: DynamicSummaryBucketsMultiQuery,
+    ) -> RpcResult<Box<RawValue>> {
+        let (tk, un) = token_identity(&token);
+        let span = tracing::info_span!(target: "monitoring", "agent::query_dynamic_summary_buckets_multi", token_key = tk, username = un, uuids_count = query.uuids.len(), buckets = query.buckets);
+        async {
+            rpc_exec!(
+                query_dynamic_summary_buckets_multi::query_dynamic_summary_buckets_multi(
+                    token, query
+                )
+                .await
             )
         }
         .instrument(span)
