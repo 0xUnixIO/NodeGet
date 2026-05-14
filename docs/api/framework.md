@@ -44,17 +44,17 @@ Axum 主路由。
 
 Server 在监听端口上同时暴露以下 HTTP 路由：
 
-| 路径                                      | 方法        | 说明                                                                     |
-|-----------------------------------------|-----------|------------------------------------------------------------------------|
-| `GET /`                                 | GET       | 返回一个包含 Server UUID 和版本信息的 HTML 页面，可用于快速确认服务是否运行                        |
-| `POST /`                                | POST      | JSON-RPC over HTTP 入口                                                  |
-| `WS /`                                  | WebSocket | JSON-RPC over WebSocket 入口                                             |
-| `/nodeget/worker-route/{route_name}/**` | ANY       | JsWorker HTTP 路由入口，详见 [HTTP Route 绑定](/api/js_worker/route.md)         |
-| `/worker-route/{route_name}/**`         | ANY       | **已废弃**，等价于 `/nodeget/worker-route/*`，保留用于迁移过渡                         |
-| `/nodeget/static/{name}/**`             | GET/HEAD  | 静态文件服务入口，详见 [Static Bucket File](/api/static_bucket_file/index.md)     |
+| 路径                                      | 方法        | 说明                                                                                    |
+|-----------------------------------------|-----------|---------------------------------------------------------------------------------------|
+| `GET /`                                 | GET       | 返回一个包含 Server UUID 和版本信息的 HTML 页面，可用于快速确认服务是否运行                                       |
+| `POST /`                                | POST      | JSON-RPC over HTTP 入口                                                                 |
+| `WS /`                                  | WebSocket | JSON-RPC over WebSocket 入口                                                            |
+| `/nodeget/worker-route/{route_name}/**` | ANY       | JsWorker HTTP 路由入口，详见 [HTTP Route 绑定](/api/js_worker/route.md)                        |
+| `/worker-route/{route_name}/**`         | ANY       | **已废弃**，等价于 `/nodeget/worker-route/*`，保留用于迁移过渡                                        |
+| `/nodeget/static/{name}/**`             | GET/HEAD  | 静态文件服务入口，详见 [Static Bucket File](/api/static_bucket_file/index.md)                    |
 | `/nodeget/static-webdav/{name}/**`      | WebDAV    | WebDAV 文件管理服务，支持 mount 为网络盘，详见 [Static Bucket File](/api/static_bucket_file/index.md) |
-| `/terminal`                             | WebSocket | Terminal WebSocket 代理，详见 [Terminal](/api/terminal/index.md)            |
-| 其他路径                                    | ANY       | **Fallback**: 所有未匹配的路径均转发到 JSON-RPC 服务处理（若启用了 `is_http_root`，则优先走静态服务） |
+| `/terminal`                             | WebSocket | Terminal WebSocket 代理，详见 [Terminal](/api/terminal/index.md)                           |
+| 其他路径                                    | ANY       | **Fallback**: 所有未匹配的路径均转发到 JSON-RPC 服务处理（若启用了 `is_http_root`，则优先走静态服务）                |
 
 Fallback 意味着你可以向任意路径发送 JSON-RPC 请求（如 `POST /api`），Server 都会正常处理。
 

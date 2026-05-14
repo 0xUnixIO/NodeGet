@@ -13,6 +13,9 @@ pub struct AgentArgs {
 
     #[arg(long, short, default_value_t = false)]
     pub version: bool,
+
+    #[arg(long, short, default_value_t = false)]
+    pub dry_run: bool,
 }
 
 impl AgentArgs {

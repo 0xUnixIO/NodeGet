@@ -154,13 +154,13 @@ const EXCLUDED_MOUNT_PREFIXES: &[&str] = &[
     "/nix/store",
 ];
 
-fn is_virtual_interface(name: &str) -> bool {
+pub fn is_virtual_interface(name: &str) -> bool {
     VIRTUAL_INTERFACE_PREFIXES
         .iter()
         .any(|prefix| name.starts_with(prefix))
 }
 
-fn is_excluded_mount(mount_point: &str) -> bool {
+pub fn is_excluded_mount(mount_point: &str) -> bool {
     EXCLUDED_MOUNT_PREFIXES
         .iter()
         .any(|prefix| mount_point.starts_with(prefix))

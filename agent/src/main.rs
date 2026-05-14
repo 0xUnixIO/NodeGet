@@ -9,6 +9,7 @@
     dead_code
 )]
 
+use crate::dry_run::dry_run;
 use crate::rpc::handle_error_message;
 use crate::rpc::monitoring_data_report::{
     handle_dynamic_monitoring_data_report, handle_static_monitoring_data_report,
@@ -20,12 +21,14 @@ use nodeget_lib::config::agent::AgentConfig;
 use nodeget_lib::error::NodegetError;
 use nodeget_lib::utils::set_ntp_offset_ms;
 use nodeget_lib::utils::version::NodeGetVersion;
+use std::process::exit;
 use std::str::FromStr;
 use std::sync::{LazyLock, OnceLock, RwLock};
 use tokio::sync::Notify;
 use tokio::task::JoinHandle;
 
 mod config_access;
+pub mod dry_run;
 mod monitoring;
 mod ntp;
 mod rpc;
@@ -122,6 +125,12 @@ async fn main() -> anyhow::Result<()> {
         let servers = config.server.clone().ok_or_else(|| {
             NodegetError::ConfigNotFound("No server configuration found".to_owned())
         })?;
+
+        dry_run().await;
+
+        if args.dry_run {
+            exit(0);
+        }
 
         let connect_timeout = config.connect_timeout_duration();
         let mut handles = rpc::multi_server::init_connections(servers, connect_timeout).await;

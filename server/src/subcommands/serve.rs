@@ -2,9 +2,9 @@ use crate::entity::js_worker;
 use axum::response::IntoResponse;
 use axum::routing::any;
 use axum::{extract::Path, http::StatusCode};
-use dav_server::{fakels::FakeLs, localfs::LocalFs, DavHandler};
-use nodeget_lib::js_runtime::RunType;
 use base64::Engine as _;
+use dav_server::{DavHandler, fakels::FakeLs, localfs::LocalFs};
+use nodeget_lib::js_runtime::RunType;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
@@ -637,7 +637,8 @@ async fn handle_js_worker_route(
         }
     }
 
-    let body_bytes = match base64::engine::general_purpose::STANDARD.decode(&js_output.body_base64) {
+    let body_bytes = match base64::engine::general_purpose::STANDARD.decode(&js_output.body_base64)
+    {
         Ok(v) => v,
         Err(e) => {
             error!(target: "js_worker", route_name = %route_name, error = %e, "failed to decode base64 body");
@@ -812,7 +813,9 @@ async fn static_webdav_handler(req: axum::extract::Request) -> axum::response::R
 
     // 3. Validate token
     let full_token = format!("{username}:{password}");
-    let token_or_auth = match nodeget_lib::permission::token_auth::TokenOrAuth::from_full_token(&full_token) {
+    let token_or_auth = match nodeget_lib::permission::token_auth::TokenOrAuth::from_full_token(
+        &full_token,
+    ) {
         Ok(t) => t,
         Err(_) => {
             let full_auth = format!("{username}|{password}");
@@ -858,7 +861,10 @@ async fn static_webdav_handler(req: axum::extract::Request) -> axum::response::R
 
     if !is_allowed {
         warn!(target: "webdav", bucket = %name, username = %username, "insufficient permissions");
-        return build_webdav_error(StatusCode::FORBIDDEN, "Forbidden: insufficient StaticBucketFile permissions");
+        return build_webdav_error(
+            StatusCode::FORBIDDEN,
+            "Forbidden: insufficient StaticBucketFile permissions",
+        );
     }
     debug!(target: "webdav", bucket = %name, username = %username, "all permissions granted");
 
@@ -898,7 +904,10 @@ fn build_webdav_auth_required() -> axum::response::Response {
 fn build_webdav_error(status: StatusCode, message: impl Into<String>) -> axum::response::Response {
     axum::http::Response::builder()
         .status(status)
-        .header(axum::http::header::CONTENT_TYPE, "text/plain; charset=utf-8")
+        .header(
+            axum::http::header::CONTENT_TYPE,
+            "text/plain; charset=utf-8",
+        )
         .body(axum::body::Body::from(message.into()))
         .expect("Failed to build response")
 }

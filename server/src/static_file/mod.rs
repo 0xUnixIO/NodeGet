@@ -487,13 +487,15 @@ pub async fn rename_file(name: &str, from: &str, to: &str) -> anyhow::Result<()>
         warn!(target: "static", path = %parent.display(), error = %e, "failed to create parent directory for rename");
     }
 
-    tokio::fs::rename(&from_resolved, &to_resolved).await.map_err(|e| {
-        if e.kind() == std::io::ErrorKind::NotFound {
-            NodegetError::NotFound(format!("Source file not found: {from}"))
-        } else {
-            NodegetError::IoError(format!("Failed to rename file: {e}"))
-        }
-    })?;
+    tokio::fs::rename(&from_resolved, &to_resolved)
+        .await
+        .map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                NodegetError::NotFound(format!("Source file not found: {from}"))
+            } else {
+                NodegetError::IoError(format!("Failed to rename file: {e}"))
+            }
+        })?;
 
     debug!(target: "static", name = %name, sub_path = %model.path, from = %from, to = %to, "file renamed");
     Ok(())

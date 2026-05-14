@@ -3,33 +3,35 @@
 `static-bucket-file` 命名空间负责操作**某个 Bucket 内的具体文件**，包括上传、读取、删除、重命名和列出文件。
 
 ::: info 与 Bucket 配置分离
-本命名空间**不修改 Bucket 配置**（如 `is_http_root`、`cors`）。Bucket 配置的 CRUD 操作在 [`static-bucket`](../static_bucket/index.md) 命名空间中完成。
+本命名空间**不修改 Bucket 配置**（如 `is_http_root`、`cors`）。Bucket 配置的 CRUD 操作在 [
+`static-bucket`](../static_bucket/index.md) 命名空间中完成。
 :::
 
 ## 权限结构
 
 - **Scope**：`StaticBucket(name)` 或 `Global`
-  - `StaticBucket(name)`：只对该 bucket 生效
-  - `Global`：对所有 bucket 生效（可用 `*` 通配）
+    - `StaticBucket(name)`：只对该 bucket 生效
+    - `Global`：对所有 bucket 生效（可用 `*` 通配）
 - **Permission**：
-  - `StaticBucketFile::Read` — 读取文件内容 (`read`)
-  - `StaticBucketFile::Write` — 上传文件 (`upload`)
-  - `StaticBucketFile::Delete` — 删除文件 (`delete`)
-  - `StaticBucketFile::List` — 列出文件 (`list`)
+    - `StaticBucketFile::Read` — 读取文件内容 (`read`)
+    - `StaticBucketFile::Write` — 上传文件 (`upload`)
+    - `StaticBucketFile::Delete` — 删除文件 (`delete`)
+    - `StaticBucketFile::List` — 列出文件 (`list`)
 
 ::: tip 为什么 List 是独立权限？
-文件列表操作只暴露目录结构（文件名、大小、修改时间），不暴露文件内容。将 `List` 与 `Read` 分离，可以授予"看得见目录"但不"读得了内容"的权限粒度。
+文件列表操作只暴露目录结构（文件名、大小、修改时间），不暴露文件内容。将 `List` 与 `Read` 分离，可以授予"看得见目录"但不"
+读得了内容"的权限粒度。
 :::
 
 ## 方法概览
 
-| 方法名 | 功能 | 所需权限 |
-|---|---|---|
-| [static-bucket-file_upload](./crud.md#upload) | 上传文件 | `StaticBucketFile::Write` |
-| [static-bucket-file_read](./crud.md#read) | 读取文件（base64 返回） | `StaticBucketFile::Read` |
-| [static-bucket-file_delete](./crud.md#delete) | 删除文件 | `StaticBucketFile::Delete` |
-| [static-bucket-file_rename](./crud.md#rename) | 重命名 / 移动文件 | `StaticBucketFile::Write` + `StaticBucketFile::Delete` |
-| [static-bucket-file_list](./crud.md#list) | 列出目录下所有文件 | `StaticBucketFile::List` |
+| 方法名                                           | 功能              | 所需权限                                                   |
+|-----------------------------------------------|-----------------|--------------------------------------------------------|
+| [static-bucket-file_upload](./crud.md#upload) | 上传文件            | `StaticBucketFile::Write`                              |
+| [static-bucket-file_read](./crud.md#read)     | 读取文件（base64 返回） | `StaticBucketFile::Read`                               |
+| [static-bucket-file_delete](./crud.md#delete) | 删除文件            | `StaticBucketFile::Delete`                             |
+| [static-bucket-file_rename](./crud.md#rename) | 重命名 / 移动文件      | `StaticBucketFile::Write` + `StaticBucketFile::Delete` |
+| [static-bucket-file_list](./crud.md#list)     | 列出目录下所有文件       | `StaticBucketFile::List`                               |
 
 ## HTTP 访问静态文件
 
@@ -88,11 +90,13 @@ curl http://localhost:3000/index.html
 ### 客户端挂载示例
 
 **macOS**（Finder）：
+
 ```
 Cmd + K → http://服务器IP:端口/nodeget/static-webdav/hugo
 ```
 
 **Windows**（资源管理器）：
+
 ```
 映射网络驱动器 → \\服务器IP@端口\nodeget\static-webdav\hugo
 # 或使用 Explorer 地址栏：
@@ -100,6 +104,7 @@ http://服务器IP:端口/nodeget/static-webdav/hugo
 ```
 
 **Linux**（命令行）：
+
 ```bash
 # 使用 davfs2
 sudo mount -t davfs http://服务器IP:端口/nodeget/static-webdav/hugo /mnt/hugo
@@ -107,6 +112,7 @@ sudo mount -t davfs http://服务器IP:端口/nodeget/static-webdav/hugo /mnt/hu
 ```
 
 **命令行 curl 示例**：
+
 ```bash
 # PROPFIND（列出目录）
 curl -X PROPFIND http://localhost:3000/nodeget/static-webdav/hugo/ \
