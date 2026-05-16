@@ -59,7 +59,7 @@ async fn get_client(family: IpFamily) -> Option<&'static Client> {
             .get_or_try_init(|| async {
                 ensure_rustls_ring_provider();
                 Client::builder()
-                    .timeout(Duration::from_secs(5))
+                    .timeout(Duration::from_secs(3))
                     .local_address(std::net::IpAddr::V4(Ipv4Addr::UNSPECIFIED))
                     .build()
             })
@@ -70,7 +70,7 @@ async fn get_client(family: IpFamily) -> Option<&'static Client> {
             .get_or_try_init(|| async {
                 ensure_rustls_ring_provider();
                 Client::builder()
-                    .timeout(Duration::from_secs(5))
+                    .timeout(Duration::from_secs(3))
                     .local_address(std::net::IpAddr::V6(Ipv6Addr::UNSPECIFIED))
                     .build()
             })
