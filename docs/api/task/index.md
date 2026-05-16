@@ -236,6 +236,61 @@ pub struct HttpRequestTaskResult {
 
 在同一个 Task 中，`TaskEventResult` 的 enum 变体需要与 `TaskEventType` 匹配
 
+---
+
+## Dns
+
+DNS 查询任务。
+
+```rust
+pub enum DnsRecordType {
+    A,
+    Aaaa,
+    Cname,
+    Mx,
+    Txt,
+    Ns,
+    Srv,
+    Ptr,
+    Soa,
+    Caa,
+}
+
+pub struct DnsTask {
+    pub domain: String,                      // 查询域名（PTR 查询时传 IP 地址）
+    pub record_types: Vec<DnsRecordType>,    // 查询记录类型列表
+    pub dns_server: Option<String>,          // 自定义 DNS 服务器 "IP:port"；None 时使用系统默认
+}
+
+pub struct DnsRecordResult {
+    pub record_type: DnsRecordType,          // 记录类型
+    pub time: f64,                           // 解析耗时（毫秒）
+    pub data: String,                        // 记录数据字符串
+}
+```
+
+行为说明：
+
+- 使用 **hickory-resolver** 库执行 DNS 查询，默认超时 10 秒
+- 支持同时查询多种记录类型，每种类型独立查询后合并结果
+- 若指定 `dns_server`，格式为 `IP:port`（如 `"8.8.8.8:53"`），必须包含端口号；未指定时使用系统默认 DNS
+- 当单个记录类型查询失败时，不影响其他类型的查询，仅记录警告
+- 若所有类型均无结果，返回错误
+- **PTR** 记录查询时，`domain` 应传入 IP 地址字符串（如 `"1.1.1.1"`），而非域名
+- **CNAME** 查询时，部分域名可能直接返回 A 记录而非 CNAME，这属于正常 DNS 行为，不表示查询失败
+- 各记录类型的数据格式：
+  - **A/AAAA**: IP 地址字符串
+  - **CNAME/NS**: 主机名字符串
+  - **MX**: `优先级 交换器`
+  - **SRV**: `优先级 权重 端口 目标`
+  - **SOA**: `主NS 负责人 序列号 刷新 重试 过期 最小TTL`
+  - **TXT**: 文本字符串
+  - **CAA**: hickory Debug 格式输出（含 flags、tag、value 等完整信息）
+
+权限要求：`Dns`
+
+---
+
 ## 查询条件
 
 需要用到统一的结构体 `TaskQueryCondition`

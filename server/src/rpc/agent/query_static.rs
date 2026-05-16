@@ -128,6 +128,17 @@ pub async fn query_static(
                 QueryCondition::TimestampTo(end) => {
                     q.filter(static_monitoring::Column::Timestamp.lte(end))
                 }
+                QueryCondition::StorageTimeFromTo(start, end) => q.filter(
+                    static_monitoring::Column::StorageTime
+                        .gte(start)
+                        .and(static_monitoring::Column::StorageTime.lte(end)),
+                ),
+                QueryCondition::StorageTimeFrom(start) => {
+                    q.filter(static_monitoring::Column::StorageTime.gte(start))
+                }
+                QueryCondition::StorageTimeTo(end) => {
+                    q.filter(static_monitoring::Column::StorageTime.lte(end))
+                }
                 QueryCondition::Limit(n) => {
                     limit_count = Some(n);
                     q

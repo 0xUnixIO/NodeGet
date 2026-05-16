@@ -43,6 +43,44 @@ pub struct HttpRequestTask {
     pub ip: Option<String>,
 }
 
+// DNS 记录类型枚举
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DnsRecordType {
+    A,
+    Aaaa,
+    Cname,
+    Mx,
+    Txt,
+    Ns,
+    Srv,
+    Ptr,
+    Soa,
+    Caa,
+}
+
+// DNS 任务参数
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+pub struct DnsTask {
+    // 查询域名
+    pub domain: String,
+    // 查询记录类型列表
+    pub record_types: Vec<DnsRecordType>,
+    // 自定义 DNS 服务器，格式 "IP:port"；None 使用系统默认
+    pub dns_server: Option<String>,
+}
+
+// DNS 查询结果
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+pub struct DnsRecordResult {
+    // 记录类型
+    pub record_type: DnsRecordType,
+    // 解析耗时（毫秒）
+    pub time: f64,
+    // 记录数据字符串
+    pub data: String,
+}
+
 // HTTP 请求任务结果
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct HttpRequestTaskResult {
@@ -73,6 +111,8 @@ pub enum TaskEventType {
     Execute(ExecuteTask), // 结构化命令执行
     // HTTP 请求任务
     HttpRequest(HttpRequestTask),
+    // DNS 查询任务
+    Dns(DnsTask),
 
     // 读取 Agent 配置任务
     ReadConfig,
@@ -100,6 +140,7 @@ impl TaskEventType {
             Self::WebShell(_) => "web_shell",
             Self::Execute(_) => "execute",
             Self::HttpRequest(_) => "http_request",
+            Self::Dns(_) => "dns",
             Self::EditConfig(_) => "edit_config",
             Self::ReadConfig => "read_config",
             Self::Ip => "ip",
@@ -139,6 +180,7 @@ impl TaskEventType {
             Self::WebShell(_) => "allow_web_shell",
             Self::Execute(_) => "allow_execute",
             Self::HttpRequest(_) => "allow_http_request",
+            Self::Dns(_) => "allow_dns",
             Self::ReadConfig => "allow_read_config",
             Self::EditConfig(_) => "allow_edit_config",
             Self::Ip => "allow_ip",
@@ -176,6 +218,8 @@ pub enum TaskEventResult {
     Execute(String), // 命令输出
     // HTTP 请求任务结果
     HttpRequest(HttpRequestTaskResult),
+    // DNS 查询结果
+    Dns(Vec<DnsRecordResult>),
 
     // 读取 Agent 配置任务结果，返回配置内容
     ReadConfig(String),
@@ -203,6 +247,7 @@ impl TaskEventResult {
             Self::WebShell(_) => "web_shell",
             Self::Execute(_) => "execute",
             Self::HttpRequest(_) => "http_request",
+            Self::Dns(_) => "dns",
             Self::ReadConfig(_) => "read_config",
             Self::EditConfig(_) => "edit_config",
             Self::Ip(_, _) => "ip",

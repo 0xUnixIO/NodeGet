@@ -10,6 +10,7 @@ pub struct Model {
     pub id: i64,
     pub uuid_id: i16,
     pub timestamp: i64,
+    pub storage_time: Option<i64>,
     #[sea_orm(column_type = "JsonBinary")]
     pub cpu_data: Json,
     #[sea_orm(column_type = "JsonBinary")]

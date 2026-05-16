@@ -1,6 +1,6 @@
 [package]
 name = "nodeget-agent"
-version = "0.2.8"
+version = "0.2.11"
 edition = "2024"
 
 [dependencies]
@@ -29,6 +29,9 @@ serde_json = { version = "1.0.149", default-features = false, features = ["std"]
 toml = { version = "1.1.2", default-features = false, features = ["std", "serde", "parse"] }
 url = { version = "2.5.8", default-features = false, features = ["std", "serde"] }
 base64 = { version = "0.22.1", default-features = false, features = ["alloc"] }
+
+# DNS client
+hickory-resolver = { version = "0.24", default-features = false, features = ["tokio-runtime", "system-config"] }
 
 # ICMP Ping
 surge-ping = "0.8.4"

@@ -13,7 +13,8 @@ use tokio::{
     task,
 };
 use tokio_tungstenite::tungstenite::Bytes;
-use tokio_tungstenite::{WebSocketStream, connect_async, tungstenite::protocol::Message};
+use tokio_tungstenite::{WebSocketStream, connect_async_tls_with_config};
+use tokio_tungstenite::tungstenite::protocol::Message;
 use url::Url;
 
 /// PTY result type
@@ -54,6 +55,7 @@ async fn release_terminal_id(terminal_id: &str) {
 pub async fn handle_pty_url(
     url: std::result::Result<Url, String>,
     terminal_id: String,
+    ignore_cert: bool,
 ) -> Result<()> {
     let url = match url {
         Ok(url) => url,
@@ -68,21 +70,26 @@ pub async fn handle_pty_url(
         // 限制 connect_async 最多 10s 握手，避免恶意/异常 server 让任务挂死，
         // 同时配合 `release_terminal_id` 保证 terminal_id 不会被永远占用。
         const PTY_CONNECT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
-        let ws =
-            match tokio::time::timeout(PTY_CONNECT_TIMEOUT, connect_async(url.to_string())).await {
-                Ok(Ok(ws)) => ws,
-                Ok(Err(e)) => {
-                    return Err(NodegetError::AgentConnectionError(format!(
-                        "Failed to connect to WebSocket: {e}"
-                    )));
-                }
-                Err(_) => {
-                    return Err(NodegetError::AgentConnectionError(format!(
-                        "WebSocket connect timed out after {}s",
-                        PTY_CONNECT_TIMEOUT.as_secs()
-                    )));
-                }
-            };
+        let connector = crate::rpc::multi_server::build_connector(ignore_cert);
+        let ws = match tokio::time::timeout(
+            PTY_CONNECT_TIMEOUT,
+            connect_async_tls_with_config(url.to_string(), None, false, connector),
+        )
+        .await
+        {
+            Ok(Ok(ws)) => ws,
+            Ok(Err(e)) => {
+                return Err(NodegetError::AgentConnectionError(format!(
+                    "Failed to connect to WebSocket: {e}"
+                )));
+            }
+            Err(_) => {
+                return Err(NodegetError::AgentConnectionError(format!(
+                    "WebSocket connect timed out after {}s",
+                    PTY_CONNECT_TIMEOUT.as_secs()
+                )));
+            }
+        };
 
         let ws_stream = ws.0;
 

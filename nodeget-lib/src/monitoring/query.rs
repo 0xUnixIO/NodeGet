@@ -98,6 +98,13 @@ pub enum QueryCondition {
     // 按时间戳结束点过滤
     TimestampTo(i64), // end
 
+    // 按入库时间范围过滤（开始时间，结束时间）
+    StorageTimeFromTo(i64, i64), // start, end
+    // 按入库时间起始点过滤
+    StorageTimeFrom(i64), // start
+    // 按入库时间结束点过滤
+    StorageTimeTo(i64), // end
+
     // 限制返回结果数量
     Limit(u64), // limit
 

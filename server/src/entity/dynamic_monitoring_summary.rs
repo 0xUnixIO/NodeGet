@@ -8,6 +8,7 @@ pub struct Model {
     pub id: i64,
     pub uuid_id: i16,
     pub timestamp: i64,
+    pub storage_time: Option<i64>,
     pub cpu_usage: Option<i16>,
     pub gpu_usage: Option<i16>,
     pub used_swap: Option<i64>,

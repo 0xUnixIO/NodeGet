@@ -142,6 +142,17 @@ pub async fn query_dynamic_summary(
                 QueryCondition::TimestampTo(end) => {
                     q.filter(dynamic_monitoring_summary::Column::Timestamp.lte(end))
                 }
+                QueryCondition::StorageTimeFromTo(start, end) => q.filter(
+                    dynamic_monitoring_summary::Column::StorageTime
+                        .gte(start)
+                        .and(dynamic_monitoring_summary::Column::StorageTime.lte(end)),
+                ),
+                QueryCondition::StorageTimeFrom(start) => {
+                    q.filter(dynamic_monitoring_summary::Column::StorageTime.gte(start))
+                }
+                QueryCondition::StorageTimeTo(end) => {
+                    q.filter(dynamic_monitoring_summary::Column::StorageTime.lte(end))
+                }
                 QueryCondition::Limit(n) => {
                     limit_count = Some(n);
                     q

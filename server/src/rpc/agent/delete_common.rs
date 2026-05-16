@@ -47,6 +47,9 @@ pub enum ResolvedCondition {
     TimestampFromTo(i64, i64),
     TimestampFrom(i64),
     TimestampTo(i64),
+    StorageTimeFromTo(i64, i64),
+    StorageTimeFrom(i64),
+    StorageTimeTo(i64),
 }
 
 pub async fn resolve_conditions(
@@ -73,6 +76,15 @@ pub async fn resolve_conditions(
             }
             QueryCondition::TimestampTo(to) => {
                 resolved.push(ResolvedCondition::TimestampTo(*to));
+            }
+            QueryCondition::StorageTimeFromTo(from, to) => {
+                resolved.push(ResolvedCondition::StorageTimeFromTo(*from, *to));
+            }
+            QueryCondition::StorageTimeFrom(from) => {
+                resolved.push(ResolvedCondition::StorageTimeFrom(*from));
+            }
+            QueryCondition::StorageTimeTo(to) => {
+                resolved.push(ResolvedCondition::StorageTimeTo(*to));
             }
             QueryCondition::Limit(_) | QueryCondition::Last => {}
         }

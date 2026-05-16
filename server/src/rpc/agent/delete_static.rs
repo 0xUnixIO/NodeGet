@@ -66,6 +66,19 @@ pub async fn delete_static(
                     ResolvedCondition::TimestampTo(end) => {
                         query = query.filter(static_monitoring::Column::Timestamp.lte(*end));
                     }
+                    ResolvedCondition::StorageTimeFromTo(start, end) => {
+                        query = query.filter(
+                            static_monitoring::Column::StorageTime
+                                .gte(*start)
+                                .and(static_monitoring::Column::StorageTime.lte(*end)),
+                        );
+                    }
+                    ResolvedCondition::StorageTimeFrom(start) => {
+                        query = query.filter(static_monitoring::Column::StorageTime.gte(*start));
+                    }
+                    ResolvedCondition::StorageTimeTo(end) => {
+                        query = query.filter(static_monitoring::Column::StorageTime.lte(*end));
+                    }
                 }
             }
 
@@ -117,6 +130,19 @@ pub async fn delete_static(
                     }
                     ResolvedCondition::TimestampTo(end) => {
                         query = query.filter(static_monitoring::Column::Timestamp.lte(*end));
+                    }
+                    ResolvedCondition::StorageTimeFromTo(start, end) => {
+                        query = query.filter(
+                            static_monitoring::Column::StorageTime
+                                .gte(*start)
+                                .and(static_monitoring::Column::StorageTime.lte(*end)),
+                        );
+                    }
+                    ResolvedCondition::StorageTimeFrom(start) => {
+                        query = query.filter(static_monitoring::Column::StorageTime.gte(*start));
+                    }
+                    ResolvedCondition::StorageTimeTo(end) => {
+                        query = query.filter(static_monitoring::Column::StorageTime.lte(*end));
                     }
                 }
             }

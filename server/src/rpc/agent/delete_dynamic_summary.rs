@@ -70,6 +70,21 @@ pub async fn delete_dynamic_summary(
                         query =
                             query.filter(dynamic_monitoring_summary::Column::Timestamp.lte(*end));
                     }
+                    ResolvedCondition::StorageTimeFromTo(start, end) => {
+                        query = query.filter(
+                            dynamic_monitoring_summary::Column::StorageTime
+                                .gte(*start)
+                                .and(dynamic_monitoring_summary::Column::StorageTime.lte(*end)),
+                        );
+                    }
+                    ResolvedCondition::StorageTimeFrom(start) => {
+                        query = query
+                            .filter(dynamic_monitoring_summary::Column::StorageTime.gte(*start));
+                    }
+                    ResolvedCondition::StorageTimeTo(end) => {
+                        query = query
+                            .filter(dynamic_monitoring_summary::Column::StorageTime.lte(*end));
+                    }
                 }
             }
 
@@ -124,6 +139,21 @@ pub async fn delete_dynamic_summary(
                     ResolvedCondition::TimestampTo(end) => {
                         query =
                             query.filter(dynamic_monitoring_summary::Column::Timestamp.lte(*end));
+                    }
+                    ResolvedCondition::StorageTimeFromTo(start, end) => {
+                        query = query.filter(
+                            dynamic_monitoring_summary::Column::StorageTime
+                                .gte(*start)
+                                .and(dynamic_monitoring_summary::Column::StorageTime.lte(*end)),
+                        );
+                    }
+                    ResolvedCondition::StorageTimeFrom(start) => {
+                        query = query
+                            .filter(dynamic_monitoring_summary::Column::StorageTime.gte(*start));
+                    }
+                    ResolvedCondition::StorageTimeTo(end) => {
+                        query = query
+                            .filter(dynamic_monitoring_summary::Column::StorageTime.lte(*end));
                     }
                 }
             }

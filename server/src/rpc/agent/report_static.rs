@@ -7,6 +7,7 @@ use nodeget_lib::error::NodegetError;
 use nodeget_lib::monitoring::data_structure::StaticMonitoringData;
 use nodeget_lib::permission::data_structure::{Permission, Scope, StaticMonitoring};
 use nodeget_lib::permission::token_auth::TokenOrAuth;
+use nodeget_lib::utils::get_local_timestamp_ms_i64;
 use sea_orm::{ActiveValue, ColumnTrait, EntityTrait, QueryFilter, Set};
 use serde_json::value::RawValue;
 use std::str::FromStr;
@@ -110,6 +111,7 @@ pub async fn report_static(
             id: ActiveValue::default(),
             uuid_id: Set(uuid_id),
             timestamp: Set(static_monitoring_data.time.cast_signed()),
+            storage_time: Set(Some(get_local_timestamp_ms_i64()?)),
             cpu_data: AgentRpcImpl::try_set_json(static_monitoring_data.cpu)
                 .map_err(|e| NodegetError::SerializationError(format!("cpu_data: {e}")))?,
             system_data: AgentRpcImpl::try_set_json(static_monitoring_data.system)

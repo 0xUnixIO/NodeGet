@@ -29,6 +29,8 @@ mod execute;
 mod ip;
 // HTTP Request 任务模块
 mod http_request;
+// DNS 查询模块
+mod dns;
 // Ping 任务模块
 pub mod ping;
 // PTY（伪终端）模块
@@ -37,6 +39,15 @@ pub mod self_update;
 
 // 检查服务器是否允许执行特定任务
 fn is_task_allowed(server: &nodeget_lib::config::agent::Server, task_type: &TaskEventType) -> bool {
+    // 若指定了 allow_task_type（非空），则以此列表为准，忽略所有单独的 allow_* 开关
+    if let Some(ref allowed) = server.allow_task_type {
+        if !allowed.is_empty() {
+            let task_name = task_type.task_name();
+            return allowed.iter().any(|t| t == task_name);
+        }
+    }
+
+    // 未指定 allow_task_type 或为空时，回退到原有的布尔开关
     match task_type {
         TaskEventType::Ping(_) => server.allow_icmp_ping.unwrap_or(false),
         TaskEventType::TcpPing(_) => server.allow_tcp_ping.unwrap_or(false),
@@ -47,6 +58,7 @@ fn is_task_allowed(server: &nodeget_lib::config::agent::Server, task_type: &Task
         TaskEventType::ReadConfig => server.allow_read_config.unwrap_or(false),
         TaskEventType::EditConfig(_) => server.allow_edit_config.unwrap_or(false),
         TaskEventType::Ip => server.allow_ip.unwrap_or(false),
+        TaskEventType::Dns(_) => server.allow_dns.unwrap_or(false),
         TaskEventType::Version => server.allow_version.unwrap_or(false),
         TaskEventType::SelfUpdate(_) => server.allow_self_update.unwrap_or(false),
     }
@@ -57,6 +69,7 @@ async fn execute_task(
     task_type: &TaskEventType,
     task_id: u64,
     task_token: &str,
+    ignore_cert: bool,
 ) -> Result<TaskEventResult> {
     match task_type {
         TaskEventType::Ping(target) => ping::icmp::ping_target(target.clone())
@@ -93,7 +106,7 @@ async fn execute_task(
         TaskEventType::WebShell(web_shell) => {
             let terminal_id = web_shell.terminal_id.to_string();
             let url = pty::parse_url(web_shell.url.clone(), task_id, task_token, &terminal_id);
-            pty::handle_pty_url(url, terminal_id)
+            pty::handle_pty_url(url, terminal_id, ignore_cert)
                 .await
                 .map(|()| TaskEventResult::WebShell(true))
                 .map_err(|e| NodegetError::Other(format!("{e}")).into())
@@ -136,6 +149,11 @@ async fn execute_task(
             let ip_info = ip::ip().await;
             Ok(TaskEventResult::Ip(ip_info.ipv4, ip_info.ipv6))
         }
+
+        TaskEventType::Dns(dns_task) => dns::query_dns(dns_task)
+            .await
+            .map(TaskEventResult::Dns)
+            .map_err(|e| NodegetError::Other(format!("{e}")).into()),
 
         TaskEventType::Version => {
             let version = nodeget_lib::utils::version::NodeGetVersion::get();
@@ -259,6 +277,7 @@ pub async fn handle_task() {
                                 task_type,
                                 json_rpc.params.result.task_id,
                                 &json_rpc.params.result.task_token,
+                                server_config.ignore_cert.unwrap_or(false),
                             );
                             if matches!(task_type, TaskEventType::WebShell(_)) {
                                 fut.await

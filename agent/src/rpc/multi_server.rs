@@ -14,9 +14,9 @@ use tokio::sync::broadcast::error::RecvError;
 use tokio::sync::{OnceCell, RwLock, broadcast};
 use tokio::task::JoinHandle;
 use tokio::time::{sleep, timeout};
-use tokio_tungstenite::connect_async;
+use tokio_tungstenite::connect_async_tls_with_config;
 use tokio_tungstenite::tungstenite::{Message, Utf8Bytes};
-use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
+use tokio_tungstenite::{Connector, MaybeTlsStream, WebSocketStream};
 
 /// Agent 结果类型
 pub type Result<T> = std::result::Result<T, NodegetError>;
@@ -131,7 +131,7 @@ async fn connection_manager(
     loop {
         info!("[{name}] Connecting to {url}...");
 
-        let ws_stream = match connect_with_retry(name, url, connect_timeout).await {
+        let ws_stream = match connect_with_retry(name, url, connect_timeout, server.ignore_cert.unwrap_or(false)).await {
             Ok(ws) => ws,
             Err(e) => {
                 error!("[{name}] Failed to connect: {e}");
@@ -404,15 +404,23 @@ async fn connect_with_retry(
     name: &str,
     url: &str,
     connect_timeout: Duration,
+    ignore_cert: bool,
 ) -> Result<WebSocketStream<MaybeTlsStream<TcpStream>>> {
     use rand::Rng;
 
     const BASE_BACKOFF: Duration = Duration::from_secs(1);
     const MAX_BACKOFF: Duration = Duration::from_mins(1);
 
+    let connector = build_connector(ignore_cert);
+
     let mut retry_count: u32 = 0;
     loop {
-        match timeout(connect_timeout, connect_async(url)).await {
+        match timeout(
+            connect_timeout,
+            connect_async_tls_with_config(url, None, false, connector.clone()),
+        )
+        .await
+        {
             Ok(Ok((ws_stream, _))) => return Ok(ws_stream),
             Ok(Err(e)) => {
                 warn!("[{name}] Connect failed: {e}");
@@ -445,6 +453,64 @@ async fn connect_with_retry(
         );
         sleep(wait).await;
     }
+}
+
+// 危险配置：忽略服务端 TLS 证书校验。
+// 仅在用户显式配置 `ignore_cert = true` 时使用。
+#[derive(Debug)]
+struct NoCertificateVerification;
+
+impl rustls::client::danger::ServerCertVerifier for NoCertificateVerification {
+    fn verify_server_cert(
+        &self,
+        _end_entity: &rustls::pki_types::CertificateDer<'_>,
+        _intermediates: &[rustls::pki_types::CertificateDer<'_>],
+        _server_name: &rustls::pki_types::ServerName<'_>,
+        _ocsp_response: &[u8],
+        _now: rustls::pki_types::UnixTime,
+    ) -> std::result::Result<rustls::client::danger::ServerCertVerified, rustls::Error> {
+        Ok(rustls::client::danger::ServerCertVerified::assertion())
+    }
+
+    fn verify_tls12_signature(
+        &self,
+        _message: &[u8],
+        _cert: &rustls::pki_types::CertificateDer<'_>,
+        _dss: &rustls::DigitallySignedStruct,
+    ) -> std::result::Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
+        Ok(rustls::client::danger::HandshakeSignatureValid::assertion())
+    }
+
+    fn verify_tls13_signature(
+        &self,
+        _message: &[u8],
+        _cert: &rustls::pki_types::CertificateDer<'_>,
+        _dss: &rustls::DigitallySignedStruct,
+    ) -> std::result::Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
+        Ok(rustls::client::danger::HandshakeSignatureValid::assertion())
+    }
+
+    fn supported_verify_schemes(&self) -> Vec<rustls::SignatureScheme> {
+        rustls::crypto::ring::default_provider()
+            .signature_verification_algorithms
+            .supported_schemes()
+    }
+}
+
+/// 根据 `ignore_cert` 构建 TLS Connector。
+///
+/// 如果 `ignore_cert` 为 `true`，返回一个不对服务器证书做任何校验的
+/// Rustls Connector；否则返回 `None`，让 `tokio-tungstenite` 使用默认的
+/// 系统/webpki 根证书校验。
+pub fn build_connector(ignore_cert: bool) -> Option<Connector> {
+    if !ignore_cert {
+        return None;
+    }
+    let config = rustls::ClientConfig::builder()
+        .dangerous()
+        .with_custom_certificate_verifier(Arc::new(NoCertificateVerification))
+        .with_no_client_auth();
+    Some(Connector::Rustls(Arc::new(config)))
 }
 
 // 发送消息到指定服务器

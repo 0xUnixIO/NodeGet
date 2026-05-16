@@ -5,6 +5,7 @@ use nodeget_lib::error::NodegetError;
 use nodeget_lib::monitoring::data_structure::DynamicMonitoringSummaryData;
 use nodeget_lib::permission::data_structure::{DynamicMonitoringSummary, Permission, Scope};
 use nodeget_lib::permission::token_auth::TokenOrAuth;
+use nodeget_lib::utils::get_local_timestamp_ms_i64;
 use sea_orm::{ActiveValue, Set};
 use serde_json::value::RawValue;
 use std::str::FromStr;
@@ -54,6 +55,7 @@ pub async fn report_dynamic_summary(
             id: ActiveValue::default(),
             uuid_id: Set(uuid_id),
             timestamp: Set(data.time.cast_signed()),
+            storage_time: Set(Some(get_local_timestamp_ms_i64()?)),
             cpu_usage: Set(data.cpu_usage),
             gpu_usage: Set(data.gpu_usage),
             used_swap: Set(data.used_swap),
