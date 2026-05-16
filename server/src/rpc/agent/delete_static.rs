@@ -43,131 +43,144 @@ pub async fn delete_static(
         let db = AgentRpcImpl::get_db()?;
         let (limit_count, is_last) = extract_limit_and_last(&conditions);
         let resolved_conditions = resolve_conditions(&conditions).await?;
+        let condition_count = conditions.len();
 
-        debug!(target: "monitoring", ?limit_count, is_last, "delete_static: executing delete");
-
-        let rows_affected = if is_last || limit_count.is_some() {
-            let mut query = static_monitoring::Entity::find();
-            for cond in &resolved_conditions {
-                match cond {
-                    ResolvedCondition::UuidId(uuid_id) => {
-                        query = query.filter(static_monitoring::Column::UuidId.eq(*uuid_id));
-                    }
-                    ResolvedCondition::TimestampFromTo(start, end) => {
-                        query = query.filter(
-                            static_monitoring::Column::Timestamp
-                                .gte(*start)
-                                .and(static_monitoring::Column::Timestamp.lte(*end)),
-                        );
-                    }
-                    ResolvedCondition::TimestampFrom(start) => {
-                        query = query.filter(static_monitoring::Column::Timestamp.gte(*start));
-                    }
-                    ResolvedCondition::TimestampTo(end) => {
-                        query = query.filter(static_monitoring::Column::Timestamp.lte(*end));
-                    }
-                    ResolvedCondition::StorageTimeFromTo(start, end) => {
-                        query = query.filter(
-                            static_monitoring::Column::StorageTime
-                                .gte(*start)
-                                .and(static_monitoring::Column::StorageTime.lte(*end)),
-                        );
-                    }
-                    ResolvedCondition::StorageTimeFrom(start) => {
-                        query = query.filter(static_monitoring::Column::StorageTime.gte(*start));
-                    }
-                    ResolvedCondition::StorageTimeTo(end) => {
-                        query = query.filter(static_monitoring::Column::StorageTime.lte(*end));
+        // 在后台执行实际删除，立即返回给客户端避免超时
+        tokio::spawn(async move {
+            let rows_affected = if is_last || limit_count.is_some() {
+                let mut query = static_monitoring::Entity::find();
+                for cond in &resolved_conditions {
+                    match cond {
+                        ResolvedCondition::UuidId(uuid_id) => {
+                            query = query.filter(static_monitoring::Column::UuidId.eq(*uuid_id));
+                        }
+                        ResolvedCondition::TimestampFromTo(start, end) => {
+                            query = query.filter(
+                                static_monitoring::Column::Timestamp
+                                    .gte(*start)
+                                    .and(static_monitoring::Column::Timestamp.lte(*end)),
+                            );
+                        }
+                        ResolvedCondition::TimestampFrom(start) => {
+                            query = query
+                                .filter(static_monitoring::Column::Timestamp.gte(*start));
+                        }
+                        ResolvedCondition::TimestampTo(end) => {
+                            query =
+                                query.filter(static_monitoring::Column::Timestamp.lte(*end));
+                        }
+                        ResolvedCondition::StorageTimeFromTo(start, end) => {
+                            query = query.filter(
+                                static_monitoring::Column::StorageTime
+                                    .gte(*start)
+                                    .and(static_monitoring::Column::StorageTime.lte(*end)),
+                            );
+                        }
+                        ResolvedCondition::StorageTimeFrom(start) => {
+                            query = query
+                                .filter(static_monitoring::Column::StorageTime.gte(*start));
+                        }
+                        ResolvedCondition::StorageTimeTo(end) => {
+                            query = query
+                                .filter(static_monitoring::Column::StorageTime.lte(*end));
+                        }
                     }
                 }
-            }
 
-            let limit = if is_last { 1 } else { limit_count.unwrap_or(0) };
-            let ids: Vec<i64> = query
-                .select_only()
-                .column(static_monitoring::Column::Id)
-                .order_by_desc(static_monitoring::Column::Timestamp)
-                .limit(limit)
-                .into_tuple()
-                .all(db)
-                .await
-                .map_err(|e| {
-                    error!(target: "monitoring", error = %e, "Database query error");
-                    NodegetError::DatabaseError(format!("Database query error: {e}"))
-                })?;
-
-            debug!(target: "monitoring", ids_count = ids.len(), limit, is_last, "Static delete fetched IDs for limit/last path");
-
-            if ids.is_empty() {
-                0
-            } else {
-                static_monitoring::Entity::delete_many()
-                    .filter(static_monitoring::Column::Id.is_in(ids))
-                    .exec(db)
+                let limit = if is_last { 1 } else { limit_count.unwrap_or(0) };
+                let ids: Vec<i64> = match query
+                    .select_only()
+                    .column(static_monitoring::Column::Id)
+                    .order_by_desc(static_monitoring::Column::Timestamp)
+                    .limit(limit)
+                    .into_tuple()
+                    .all(db)
                     .await
-                    .map_err(|e| {
-                        error!(target: "monitoring", error = %e, "Database delete error");
-                        NodegetError::DatabaseError(format!("Database delete error: {e}"))
-                    })?
-                    .rows_affected
-            }
-        } else {
-            let mut query = static_monitoring::Entity::delete_many();
-            for cond in &resolved_conditions {
-                match cond {
-                    ResolvedCondition::UuidId(uuid_id) => {
-                        query = query.filter(static_monitoring::Column::UuidId.eq(*uuid_id));
+                {
+                    Ok(ids) => ids,
+                    Err(e) => {
+                        error!(target: "monitoring", error = %e, "Background delete_static: query error");
+                        return;
                     }
-                    ResolvedCondition::TimestampFromTo(start, end) => {
-                        query = query.filter(
-                            static_monitoring::Column::Timestamp
-                                .gte(*start)
-                                .and(static_monitoring::Column::Timestamp.lte(*end)),
-                        );
-                    }
-                    ResolvedCondition::TimestampFrom(start) => {
-                        query = query.filter(static_monitoring::Column::Timestamp.gte(*start));
-                    }
-                    ResolvedCondition::TimestampTo(end) => {
-                        query = query.filter(static_monitoring::Column::Timestamp.lte(*end));
-                    }
-                    ResolvedCondition::StorageTimeFromTo(start, end) => {
-                        query = query.filter(
-                            static_monitoring::Column::StorageTime
-                                .gte(*start)
-                                .and(static_monitoring::Column::StorageTime.lte(*end)),
-                        );
-                    }
-                    ResolvedCondition::StorageTimeFrom(start) => {
-                        query = query.filter(static_monitoring::Column::StorageTime.gte(*start));
-                    }
-                    ResolvedCondition::StorageTimeTo(end) => {
-                        query = query.filter(static_monitoring::Column::StorageTime.lte(*end));
+                };
+
+                debug!(target: "monitoring", ids_count = ids.len(), limit, is_last, "Static delete fetched IDs for limit/last path");
+
+                if ids.is_empty() {
+                    0
+                } else {
+                    match static_monitoring::Entity::delete_many()
+                        .filter(static_monitoring::Column::Id.is_in(ids))
+                        .exec(db)
+                        .await
+                    {
+                        Ok(r) => r.rows_affected,
+                        Err(e) => {
+                            error!(target: "monitoring", error = %e, "Background delete_static: delete error");
+                            return;
+                        }
                     }
                 }
-            }
-            query
-                .exec(db)
-                .await
-                .map_err(|e| {
-                    error!(target: "monitoring", error = %e, "Database delete error");
-                    NodegetError::DatabaseError(format!("Database delete error: {e}"))
-                })?
-                .rows_affected
-        };
+            } else {
+                let mut query = static_monitoring::Entity::delete_many();
+                for cond in &resolved_conditions {
+                    match cond {
+                        ResolvedCondition::UuidId(uuid_id) => {
+                            query = query.filter(static_monitoring::Column::UuidId.eq(*uuid_id));
+                        }
+                        ResolvedCondition::TimestampFromTo(start, end) => {
+                            query = query.filter(
+                                static_monitoring::Column::Timestamp
+                                    .gte(*start)
+                                    .and(static_monitoring::Column::Timestamp.lte(*end)),
+                            );
+                        }
+                        ResolvedCondition::TimestampFrom(start) => {
+                            query = query
+                                .filter(static_monitoring::Column::Timestamp.gte(*start));
+                        }
+                        ResolvedCondition::TimestampTo(end) => {
+                            query =
+                                query.filter(static_monitoring::Column::Timestamp.lte(*end));
+                        }
+                        ResolvedCondition::StorageTimeFromTo(start, end) => {
+                            query = query.filter(
+                                static_monitoring::Column::StorageTime
+                                    .gte(*start)
+                                    .and(static_monitoring::Column::StorageTime.lte(*end)),
+                            );
+                        }
+                        ResolvedCondition::StorageTimeFrom(start) => {
+                            query = query
+                                .filter(static_monitoring::Column::StorageTime.gte(*start));
+                        }
+                        ResolvedCondition::StorageTimeTo(end) => {
+                            query = query
+                                .filter(static_monitoring::Column::StorageTime.lte(*end));
+                        }
+                    }
+                }
+                match query.exec(db).await {
+                    Ok(r) => r.rows_affected,
+                    Err(e) => {
+                        error!(target: "monitoring", error = %e, "Background delete_static: delete error");
+                        return;
+                    }
+                }
+            };
 
-        debug!(target: "monitoring", rows_affected = rows_affected, conditions = conditions.len(), "Static monitoring delete completed");
+            debug!(target: "monitoring", rows_affected, conditions = condition_count, "Background static monitoring delete completed");
 
-        if rows_affected > 0 {
-            if let Err(e) = crate::agent_uuid_cache::AgentUuidCache::resync().await {
-                error!(target: "agent_uuid", error = %e, "Failed to resync AgentUuidCache after delete_static");
+            if rows_affected > 0 {
+                if let Err(e) = crate::agent_uuid_cache::AgentUuidCache::resync().await {
+                    error!(target: "agent_uuid", error = %e, "Failed to resync AgentUuidCache after delete_static");
+                }
             }
-        }
+        });
 
         let json_str = format!(
-            "{{\"success\":true,\"deleted\":{},\"condition_count\":{}}}",
-            rows_affected,
-            conditions.len()
+            "{{\"success\":true,\"condition_count\":{}}}",
+            condition_count
         );
         RawValue::from_string(json_str)
             .map_err(|e| NodegetError::SerializationError(e.to_string()).into())
