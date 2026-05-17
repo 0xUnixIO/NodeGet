@@ -16,15 +16,15 @@ use serde_json::value::RawValue;
 use tracing::Instrument;
 use uuid::Uuid;
 
-#[rpc(server)]
+#[rpc(server, namespace = "agent-uuid")]
 pub trait AgentUuidRpc {
-    #[method(name = "agent-uuid.list_all")]
+    #[method(name = "list_all")]
     async fn list_all_agent_uuids(&self, token: String) -> RpcResult<Box<RawValue>>;
 
-    #[method(name = "agent-uuid.list_all_with_agent_mode")]
+    #[method(name = "list_all_with_agent_mode")]
     async fn list_all_agent_uuids_with_agent_mode(&self, token: String) -> RpcResult<Box<RawValue>>;
 
-    #[method(name = "agent-uuid.delete")]
+    #[method(name = "delete")]
     async fn delete_agent_uuid(
         &self,
         token: String,
