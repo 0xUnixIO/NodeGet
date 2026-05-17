@@ -6,7 +6,7 @@
 
 ### 方法
 
-调用方法名为 `agent-uuid.list_all`，需要提供以下参数：
+调用方法名为 `agent-uuid_list_all`，需要提供以下参数：
 
 ```json
 {
@@ -75,7 +75,7 @@
 
 ### 方法
 
-调用方法名为 `agent-uuid.delete`，需要提供以下参数：
+调用方法名为 `agent-uuid_delete`，需要提供以下参数：
 
 ```json
 {
@@ -160,7 +160,7 @@
 
 ### 方法
 
-调用方法名为 `agent-uuid.list_all_with_agent_mode`，需要提供以下参数：
+调用方法名为 `agent-uuid_list_all_with_agent_mode`，需要提供以下参数：
 
 ```json
 {
@@ -202,7 +202,7 @@
 ```json
 {
   "jsonrpc": "2.0",
-  "method": "agent-uuid.list_all_with_agent_mode",
+  "method": "agent-uuid_list_all_with_agent_mode",
   "params": {
     "token": "demo_token"
   },
@@ -231,7 +231,7 @@
 
 ### 行为说明
 
-- **数据来源**：与 `agent-uuid.list_all` 一致，直接读取 **内存缓存**（`MonitoringUuidCache`），不涉及数据库查询，性能为 O(n) 纯内存遍历
+- **数据来源**：与 `agent-uuid_list_all` 一致，直接读取 **内存缓存**（`MonitoringUuidCache`），不涉及数据库查询，性能为 O(n) 纯内存遍历
 - **包含软删除记录**：返回所有已知的 Agent UUID，包括已被软删除的；通过 `soft_delete` 字段区分状态
 - **排序**：返回结果按 UUID 字母顺序排序，输出稳定
 - **实时性**：数据为内存缓存的快照，仅在 `monitoring_uuid` 表发生变更（如软删除、新增 Agent）并触发 `reload()` 后才会更新
