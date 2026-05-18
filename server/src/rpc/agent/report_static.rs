@@ -10,7 +10,6 @@ use nodeget_lib::permission::token_auth::TokenOrAuth;
 use nodeget_lib::utils::get_local_timestamp_ms_i64;
 use sea_orm::{ActiveValue, ColumnTrait, EntityTrait, QueryFilter, Set};
 use serde_json::value::RawValue;
-use std::str::FromStr;
 use tracing::{debug, error};
 
 pub async fn report_static(
@@ -18,8 +17,7 @@ pub async fn report_static(
     static_monitoring_data: StaticMonitoringData,
 ) -> RpcResult<Box<RawValue>> {
     let process_logic = async {
-        let agent_uuid = uuid::Uuid::from_str(&static_monitoring_data.uuid)
-            .map_err(|e| NodegetError::ParseError(format!("Invalid UUID format: {e}")))?;
+        let agent_uuid = static_monitoring_data.uuid;
         debug!(target: "monitoring", agent_uuid = %agent_uuid, "report_static: UUID parsed");
 
         let token_or_auth = TokenOrAuth::from_full_token(&token)
@@ -47,8 +45,13 @@ pub async fn report_static(
             .await
             .map_err(|e| NodegetError::DatabaseError(format!("UUID cache error: {e}")))?;
 
-        crate::agent_uuid_cache::AgentUuidCache::global()
-            .notify_seen(agent_uuid)
+        // Update in-memory last-cache (used by multi-last queries, zero DB hit)
+        crate::monitoring_last_cache::MonitoringLastCache::global()
+            .update_static(
+                agent_uuid,
+                static_monitoring_data.time.cast_signed(),
+                &static_monitoring_data,
+            )
             .await;
 
         // Fast path: check in-memory hash cache first to avoid DB query

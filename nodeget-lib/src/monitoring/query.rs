@@ -162,7 +162,7 @@ pub struct DynamicDataAvgQuery {
 #[derive(Serialize)]
 pub struct StaticResponseItem {
     // 设备 UUID
-    pub uuid: String,
+    pub uuid: uuid::Uuid,
     // 时间戳
     pub timestamp: i64,
     // CPU 数据，可选
@@ -180,7 +180,7 @@ pub struct StaticResponseItem {
 #[derive(Serialize)]
 pub struct DynamicResponseItem {
     // 设备 UUID
-    pub uuid: String,
+    pub uuid: uuid::Uuid,
     // 时间戳
     pub timestamp: i64,
     // CPU 数据，可选
@@ -332,7 +332,7 @@ pub struct DynamicSummaryBucketsMultiQuery {
 // 动态监控摘要数据响应项结构体
 #[derive(Serialize)]
 pub struct DynamicSummaryResponseItem {
-    pub uuid: String,
+    pub uuid: uuid::Uuid,
     pub timestamp: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cpu_usage: Option<Value>,

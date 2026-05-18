@@ -46,7 +46,7 @@ impl Monitor for StaticMonitoringData {
     async fn refresh_and_get() -> Self {
         let (system_data, gpu_data) =
             tokio::join!(StaticDataFromSystem::get(), StaticDataFromGpu::get());
-        let agent_uuid = crate::config_access::current_agent_uuid_string();
+        let agent_uuid = crate::config_access::current_agent_uuid();
 
         let cpu = system_data.0.clone();
         let system = system_data.1.clone();
@@ -103,7 +103,7 @@ impl Monitor for DynamicMonitoringData {
         let ((cpu, ram, load, system), gpu_data, disk_data, network_data) =
             tokio::join!(system_fut, gpu_fut, disk_fut, network_fut);
 
-        let agent_uuid = crate::config_access::current_agent_uuid_string();
+        let agent_uuid = crate::config_access::current_agent_uuid();
 
         Self {
             uuid: agent_uuid,

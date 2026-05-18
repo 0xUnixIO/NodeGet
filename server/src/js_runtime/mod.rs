@@ -522,7 +522,7 @@ pub fn js_runner(
                             status: routeResponse.status,
                             headers: Array.from(routeResponse.headers.entries())
                                 .map(([name, value]) => ({ name, value })),
-                            body_base64: btoa(String.fromCharCode(...routeBody))
+                            body_base64: Buffer.from(routeBody).toString('base64')
                         };
                     }
 
@@ -775,7 +775,7 @@ pub fn js_runner_source_mode(
                             status: routeResponse.status,
                             headers: Array.from(routeResponse.headers.entries())
                                 .map(([name, value]) => ({ name, value })),
-                            body_base64: btoa(String.fromCharCode(...routeBody))
+                            body_base64: Buffer.from(routeBody).toString('base64')
                         };
                     }
 

@@ -628,7 +628,7 @@ async fn execute_on_worker(
                         status: routeResponse.status,
                         headers: Array.from(routeResponse.headers.entries())
                             .map(([name, value]) => ({ name, value })),
-                        body_base64: btoa(String.fromCharCode(...routeBody))
+                        body_base64: Buffer.from(routeBody).toString('base64')
                     };
                 }
 

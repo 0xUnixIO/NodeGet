@@ -29,7 +29,17 @@ pub fn get_agent_config() -> Result<AgentConfig, NodegetError> {
         .map_err(|_| NodegetError::Other("AGENT_CONFIG lock poisoned".to_owned()))
 }
 
-/// Return the agent uuid (as a hyphenated `String`) from the shared config.
+/// Return the agent uuid as a [`uuid::Uuid`].
+///
+/// # Panics
+///
+/// 同 `current_agent_uuid_string`。
+#[must_use]
+pub fn current_agent_uuid() -> uuid::Uuid {
+    current_agent_uuid_string()
+        .parse()
+        .expect("agent_uuid in config is not a valid UUID")
+}
 ///
 /// # Panics
 ///

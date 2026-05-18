@@ -6,6 +6,10 @@ export default [
                 text: '主题开发',
                 link: '/dev/theme/index.md'
             },
+            {
+                text: '优秀主题',
+                link: '/dev/theme/awesome-theme.md'
+            },
         ]
     },
     {

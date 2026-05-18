@@ -20,7 +20,6 @@ mod rpc;
 // 终端模块，处理终端连接
 mod terminal;
 // 令牌模块，处理令牌相关功能
-pub(crate) mod agent_uuid_cache;
 mod crontab;
 pub mod js_runtime;
 mod kv;
@@ -31,19 +30,18 @@ mod rpc_timing;
 mod static_file;
 mod ws_counter;
 pub(crate) mod static_hash_cache;
+pub(crate) mod token;
 
 pub(crate) mod monitoring_last_cache;
 pub(crate) mod monitoring_push;
 mod subcommands;
-mod token;
 pub(crate) mod visitor_stats;
 
 // 全局数据库连接单例
 pub static DB: tokio::sync::OnceCell<sea_orm::DatabaseConnection> =
     tokio::sync::OnceCell::const_new();
 
-// 全局服务器配置单例
-static SERVER_CONFIG: std::sync::OnceLock<
+pub(crate) static SERVER_CONFIG: std::sync::OnceLock<
     std::sync::RwLock<nodeget_lib::config::server::ServerConfig>,
 > = std::sync::OnceLock::new();
 pub(crate) static SERVER_CONFIG_PATH: std::sync::OnceLock<String> = std::sync::OnceLock::new();
