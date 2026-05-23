@@ -95,6 +95,7 @@ pub enum NodeGet {
     GetRtPool,
     #[deprecated(since = "0.2.13", note = "Use MonitoringUuid::Delete instead")]
     DeleteAgentUuid,
+    ExecSql,
 }
 
 // MonitoringUuid 权限枚举（权威 Agent UUID 管理权限）

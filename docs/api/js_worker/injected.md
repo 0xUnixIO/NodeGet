@@ -13,7 +13,56 @@
 - `globalThis.inlineCall(js_worker_name, params, timeout_sec?)` — 调用其他 JS Worker。`timeout_sec`
   为可选的软超时（秒，正有限数），最终生效超时取 `timeout_sec` 与目标 Worker `max_run_time` 中较小者；不传时仅受目标 Worker
   `max_run_time` 约束。
+- `globalThis.execSql(token, sql, params?)` — 执行原始 SQL 语句，参数化查询，返回 JSON 格式结果。
+  需要 `NodeGet::ExecSql` 权限。详见下方说明。
+- `globalThis.getDatabaseType(token)` — 获取当前节点使用的数据库类型（`sqlite`/`postgres`）。
+  需要 `NodeGet::ExecSql` 权限。
 - `globalThis.randomUUID()` — 生成随机 UUID v4 字符串
+
+### `execSql` 使用说明
+
+> 需要传入拥有 `NodeGet::ExecSql` 权限的 token。
+
+```javascript
+// ── SELECT 查询 ──
+const res = await execSql(token, "SELECT id, name, age FROM users WHERE age > ?", [18]);
+// res: { success: true, data: [{id: 1, name: "Alice", age: 25}, ...], row_count: 2 }
+
+// ── INSERT / UPDATE / DELETE ──
+const res = await execSql(token, "UPDATE users SET status = ? WHERE id = ?", ["active", 1]);
+// res: { success: true, data: [], row_count: 0 }
+// DML 语句不返回行数据，data 始终为空数组
+
+// ── 无参数查询 ──
+const res = await execSql(token, "SELECT * FROM users");
+
+// ── PRAGMA 命令（SQLite） ──
+const res = await execSql(token, "PRAGMA table_info(users)");
+
+// ── JSON 参数 ──
+const res = await execSql(token,
+    'INSERT INTO users (name, data) VALUES (?, ?)',
+    ["Alice", { role: "admin", tags: ["a", "b"] }]
+);
+```
+
+**SQL 占位符差异：**
+- **SQLite**: 使用 `?`
+- **PostgreSQL**: 使用 `$1`, `$2`, ...
+
+### `getDatabaseType` 使用说明
+
+```javascript
+const { data: dbType } = await getDatabaseType(token);
+// dbType: "sqlite" | "postgres"
+```
+
+建议先检测数据库类型再编写适配的 SQL：
+```javascript
+const { data: dbType } = await getDatabaseType(token);
+const placeholder = dbType === "postgres" ? "$1" : "?";
+const res = await execSql(token, `SELECT * FROM users WHERE age > ${placeholder}`, [18]);
+```
 
 ### runtimeCtx（handler 第三参数）
 

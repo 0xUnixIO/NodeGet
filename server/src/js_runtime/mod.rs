@@ -208,6 +208,22 @@ pub(crate) fn init_js_runtime_globals(ctx: &Ctx<'_>) -> Result<(), Error> {
             const raw = await globalThis.__nodeget_inline_call_raw(name, paramsJson, timeoutSec, caller);
             return JSON.parse(raw);
         };
+        globalThis.execSql = async (token, sql, params) => {
+            const resp = await nodeget("nodeget-server_exec_sql", {
+                token: token,
+                sql: sql,
+                params: params !== undefined && params !== null ? params : null
+            });
+            if (resp.error) throw new Error(resp.error.message);
+            return resp.result;
+        };
+        globalThis.getDatabaseType = async (token) => {
+            const resp = await nodeget("nodeget-server_get_database_type", {
+                token: token
+            });
+            if (resp.error) throw new Error(resp.error.message);
+            return resp.result;
+        };
         "#,
     )?;
     Ok(())

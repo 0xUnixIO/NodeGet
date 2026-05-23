@@ -709,3 +709,307 @@ curl -X POST http://127.0.0.1:2211/jsonrpc \
 - 替换二进制前会自动备份原文件为 `<current>.old`
 - 重启使用 `execve` 覆盖当前进程，PID 不变，systemd 等外部管理器无感知
 - 更新失败时（如下载不完整、替换失败）不会重启，原进程继续运行
+
+## Exec SQL
+
+执行原始 SQL 语句，支持参数化查询，返回值统一转换为 JSON 格式。
+
+### 方法
+
+调用方法名为 `nodeget-server_exec_sql`，需要提供以下参数：
+
+```json
+{
+  "token": "demo_token",
+  "sql": "SELECT id, name FROM users WHERE age > ?",
+  "params": [18]
+}
+```
+
+- `sql` (string): 要执行的原始 SQL 语句，支持所有 SQL 类型（SELECT/INSERT/UPDATE/DELETE/DDL/PRAGMA）
+- `params` (array, optional): 参数化查询的值数组，用于替换 SQL 中的占位符，默认为 `null`
+
+### 权限要求
+
+- Permission: `NodeGet::ExecSql`
+- Scope 行为:
+    - `Global` Scope 下拥有该权限: 可执行任意 SQL
+    - `JsWorker(worker_name)` Scope 下拥有该权限: 可执行 SQL，Worker 名自动限制为当前脚本名称
+
+`token` 支持以下格式之一:
+
+- `token_key:token_secret`
+- `username|password`
+
+### 返回值
+
+统一返回以下 JSON 结构:
+
+```json
+{
+  "success": true,
+  "data": [],
+  "row_count": 0
+}
+```
+
+- `success` (boolean): 是否执行成功
+- `data` (array): SELECT 查询返回结果行的 JSON 数组；INSERT/UPDATE/DELETE/DDL 返回空数组 `[]`
+- `row_count` (number): SELECT 返回的行数，或 DML 语句的影响行数
+
+### SQL 占位符差异
+
+不同数据库后端的占位符语法:
+
+- **SQLite**: 使用 `?` 作为占位符
+- **PostgreSQL**: 使用 `$1`, `$2`, ... 作为占位符
+
+建议先调用 `get_database_type` 获取类型后再编写适配的 SQL。
+
+### 完整示例
+
+**SELECT 查询:**
+
+请求:
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "nodeget-server_exec_sql",
+  "params": {
+    "token": "demo_token",
+    "sql": "SELECT id, name, age FROM users WHERE age > ?",
+    "params": [18]
+  },
+  "id": 1
+}
+```
+
+响应:
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "success": true,
+    "data": [
+      {"id": 1, "name": "Alice", "age": 25},
+      {"id": 2, "name": "Bob", "age": 30}
+    ],
+    "row_count": 2
+  },
+  "id": 1
+}
+```
+
+**INSERT 查询:**
+
+请求:
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "nodeget-server_exec_sql",
+  "params": {
+    "token": "demo_token",
+    "sql": "INSERT INTO users (name, age) VALUES (?, ?)",
+    "params": ["Charlie", 22]
+  },
+  "id": 2
+}
+```
+
+响应:
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "success": true,
+    "data": [],
+    "row_count": 1
+  },
+  "id": 2
+}
+```
+
+**UPDATE 查询:**
+
+请求:
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "nodeget-server_exec_sql",
+  "params": {
+    "token": "demo_token",
+    "sql": "UPDATE users SET age = ? WHERE name = ?",
+    "params": [23, "Charlie"]
+  },
+  "id": 3
+}
+```
+
+响应:
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "success": true,
+    "data": [],
+    "row_count": 1
+  },
+  "id": 3
+}
+```
+
+**DELETE 查询:**
+
+请求:
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "nodeget-server_exec_sql",
+  "params": {
+    "token": "demo_token",
+    "sql": "DELETE FROM users WHERE id = ?",
+    "params": [1]
+  },
+  "id": 4
+}
+```
+
+响应:
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "success": true,
+    "data": [],
+    "row_count": 1
+  },
+  "id": 4
+}
+```
+
+**DDL 查询 (CREATE TABLE):**
+
+请求:
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "nodeget-server_exec_sql",
+  "params": {
+    "token": "demo_token",
+    "sql": "CREATE TABLE IF NOT EXISTS logs (id INTEGER PRIMARY KEY, message TEXT)"
+  },
+  "id": 5
+}
+```
+
+响应:
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "success": true,
+    "data": [],
+    "row_count": 0
+  },
+  "id": 5
+}
+```
+
+**错误示例 (权限不足):**
+
+响应:
+```json
+{
+  "jsonrpc": "2.0",
+  "error": {
+    "code": 102,
+    "message": "Permission Denied: Requires NodeGet::ExecSql"
+  },
+  "id": 6
+}
+```
+
+**错误示例 (SQL 语法错误):**
+
+响应:
+```json
+{
+  "jsonrpc": "2.0",
+  "error": {
+    "code": -32603,
+    "message": "SQL execution failed: near \"SELEC\": syntax error"
+  },
+  "id": 7
+}
+```
+
+## Get Database Type
+
+获取当前节点使用的数据库后端类型。
+
+### 方法
+
+调用方法名为 `nodeget-server_get_database_type`，需要提供以下参数：
+
+```json
+{
+  "token": "demo_token"
+}
+```
+
+### 权限要求
+
+- Permission: `NodeGet::ExecSql`
+- Scope 行为:
+    - `Global` Scope 下拥有该权限: 可返回数据库类型
+    - `JsWorker(worker_name)` Scope 下拥有该权限: 可返回数据库类型
+
+`token` 支持以下格式之一:
+
+- `token_key:token_secret`
+- `username|password`
+
+### 返回值
+
+返回包含 `database_type` 字段的对象，可能的值为:
+
+- `"sqlite"`: 当前使用 SQLite 数据库
+- `"postgres"`: 当前使用 PostgreSQL 数据库
+
+### 完整示例
+
+请求:
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "nodeget-server_get_database_type",
+  "params": {
+    "token": "demo_token"
+  },
+  "id": 1
+}
+```
+
+响应:
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "success": true,
+    "data": "sqlite"
+  },
+  "id": 1
+}
+```
+
+错误示例 (权限不足):
+```json
+{
+  "jsonrpc": "2.0",
+  "error": {
+    "code": 102,
+    "message": "Permission Denied: Requires NodeGet::ExecSql"
+  },
+  "id": 1
+}
+```
