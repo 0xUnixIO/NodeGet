@@ -17,6 +17,10 @@ NodeGet 是本项目的基础服务接口模块，提供服务端状态查询、
 | [database_storage](./crud.md#database-storage)       | 查询数据库各表存储占用         | SuperToken                  |
 | [log](./crud.md#log)                                 | 查询内存日志缓冲区           | SuperToken                  |
 | [stream_log](./crud.md#stream-log)                   | 实时流式日志订阅（WebSocket） | SuperToken                  |
+| [exec_sql](./crud.md#exec-sql)                       | 在主数据库执行原始 SQL       | `NodeGet::ExecSql`          |
+| [get_database_type](./crud.md#get-database-type)     | 获取主数据库后端类型          | `NodeGet::ExecSql`          |
+
+如需对本地 SQLite 数据库执行 SQL 操作，请使用 [Db 命名空间](../db/index.md)。
 
 ## 版本信息结构体
 
@@ -24,19 +28,32 @@ NodeGet 是本项目的基础服务接口模块，提供服务端状态查询、
 
 ```json
 {
-    "binary_type": "Server", // 二进制类型
-    "build_time": "2026-02-08T10:44:02.848471700Z", // 构建时间
-    "cargo_target_triple": "x86_64-pc-windows-msvc", // 编译目标
-    "cargo_version": "0.0.1", // Cargo 版本号
-    "git_branch": "main", // Git 分支
-    "git_commit_date": "2026-02-08T07:25:09.000000000Z", // 提交日期
-    "git_commit_message": "Feat: ...", // 提交信息
-    "git_commit_sha": "73d9589", // 提交 SHA
-    "rustc_channel": "nightly", // Rust 编译器通道
-    "rustc_commit_date": "2025-12-30", // Rust 编译器提交日期
-    "rustc_commit_hash": "0e8999942552691afc20495af6227eca8ab0af05", // Rust 编译器提交 Hash
-    "rustc_llvm_version": "21.1", // LLVM 版本
-    "rustc_version": "1.94.0-nightly" // Rust 版本
+  "binary_type": "Server",
+  // 二进制类型
+  "build_time": "2026-02-08T10:44:02.848471700Z",
+  // 构建时间
+  "cargo_target_triple": "x86_64-pc-windows-msvc",
+  // 编译目标
+  "cargo_version": "0.0.1",
+  // Cargo 版本号
+  "git_branch": "main",
+  // Git 分支
+  "git_commit_date": "2026-02-08T07:25:09.000000000Z",
+  // 提交日期
+  "git_commit_message": "Feat: ...",
+  // 提交信息
+  "git_commit_sha": "73d9589",
+  // 提交 SHA
+  "rustc_channel": "nightly",
+  // Rust 编译器通道
+  "rustc_commit_date": "2025-12-30",
+  // Rust 编译器提交日期
+  "rustc_commit_hash": "0e8999942552691afc20495af6227eca8ab0af05",
+  // Rust 编译器提交 Hash
+  "rustc_llvm_version": "21.1",
+  // LLVM 版本
+  "rustc_version": "1.94.0-nightly"
+  // Rust 版本
 }
 ```
 
@@ -46,10 +63,10 @@ NodeGet 是本项目的基础服务接口模块，提供服务端状态查询、
 
 ```json
 {
-    "uuids": [
-        "e8583352-39e8-5a5b-b66c-e450689088fd",
-        "a1b2c3d4-5e6f-7a8b-9c0d-1e2f3a4b5c6d"
-    ]
+  "uuids": [
+    "e8583352-39e8-5a5b-b66c-e450689088fd",
+    "a1b2c3d4-5e6f-7a8b-9c0d-1e2f3a4b5c6d"
+  ]
 }
 ```
 
@@ -67,18 +84,28 @@ NodeGet 是本项目的基础服务接口模块，提供服务端状态查询、
 
 ```json
 {
-    "tables": {
-        "crontab": 4096,            // crontab 表大小（字节）
-        "crontab_result": 8192,     // crontab_result 表大小（字节）
-        "dynamic_monitoring": 16384, // dynamic_monitoring 表大小（字节）
-        "js_result": 4096,          // js_result 表大小（字节）
-        "js_worker": 4096,          // js_worker 表大小（字节）
-        "kv": 8192,                 // kv 表大小（字节）
-        "static_monitoring": 8192,  // static_monitoring 表大小（字节）
-        "task": 4096,               // task 表大小（字节）
-        "token": 4096               // token 表大小（字节）
-    },
-    "total": 61440 // 所有表大小之和（字节）
+  "tables": {
+    "crontab": 4096,
+    // crontab 表大小（字节）
+    "crontab_result": 8192,
+    // crontab_result 表大小（字节）
+    "dynamic_monitoring": 16384,
+    // dynamic_monitoring 表大小（字节）
+    "js_result": 4096,
+    // js_result 表大小（字节）
+    "js_worker": 4096,
+    // js_worker 表大小（字节）
+    "kv": 8192,
+    // kv 表大小（字节）
+    "static_monitoring": 8192,
+    // static_monitoring 表大小（字节）
+    "task": 4096,
+    // task 表大小（字节）
+    "token": 4096
+    // token 表大小（字节）
+  },
+  "total": 61440
+  // 所有表大小之和（字节）
 }
 ```
 
@@ -109,20 +136,26 @@ NodeGet 是本项目的基础服务接口模块，提供服务端状态查询、
 
 ```json
 {
-    "timestamp": "2026-04-11T12:00:00.000+08:00", // ISO 8601 时间戳（含时区）
-    "level": "DEBUG",                              // 日志级别: TRACE / DEBUG / INFO / WARN / ERROR
-    "target": "rpc",                               // 日志 target（数据库相关统一为 "db"）
-    "message": "success",                          // 日志消息
-    "fields": {                                    // 结构化字段（可为空对象）
-        "token_key": "abc123",
-        "response_len": "42"
-    },
-    "spans": [                                     // span 上下文（可为空数组）
-        {
-            "name": "kv::get_value",
-            "fields": "namespace=test key=foo"
-        }
-    ]
+  "timestamp": "2026-04-11T12:00:00.000+08:00",
+  // ISO 8601 时间戳（含时区）
+  "level": "DEBUG",
+  // 日志级别: TRACE / DEBUG / INFO / WARN / ERROR
+  "target": "rpc",
+  // 日志 target（数据库相关统一为 "db"）
+  "message": "success",
+  // 日志消息
+  "fields": {
+    // 结构化字段（可为空对象）
+    "token_key": "abc123",
+    "response_len": "42"
+  },
+  "spans": [
+    // span 上下文（可为空数组）
+    {
+      "name": "kv::get_value",
+      "fields": "namespace=test key=foo"
+    }
+  ]
 }
 ```
 
@@ -135,19 +168,25 @@ NodeGet 是本项目的基础服务接口模块，提供服务端状态查询、
 
 ```json
 {
-    "timestamp": "2026-04-11T12:00:01.234+08:00", // ISO 8601 时间戳（含时区）
-    "level": "DEBUG",                              // 日志级别: TRACE / DEBUG / INFO / WARN / ERROR
-    "target": "rpc",                               // 日志 target（数据库相关统一为 "db"）
-    "message": "success",                          // 日志消息
-    "fields": {                                    // 结构化字段（可为空对象）
-        "token_key": "abc123"
-    },
-    "spans": [                                     // span 上下文（可为空数组）
-        {
-            "name": "kv::get_value",
-            "fields": "namespace=test key=foo"
-        }
-    ]
+  "timestamp": "2026-04-11T12:00:01.234+08:00",
+  // ISO 8601 时间戳（含时区）
+  "level": "DEBUG",
+  // 日志级别: TRACE / DEBUG / INFO / WARN / ERROR
+  "target": "rpc",
+  // 日志 target（数据库相关统一为 "db"）
+  "message": "success",
+  // 日志消息
+  "fields": {
+    // 结构化字段（可为空对象）
+    "token_key": "abc123"
+  },
+  "spans": [
+    // span 上下文（可为空数组）
+    {
+      "name": "kv::get_value",
+      "fields": "namespace=test key=foo"
+    }
+  ]
 }
 ```
 

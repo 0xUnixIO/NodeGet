@@ -58,19 +58,32 @@
 
 ```json
 {
-  "binary_type": "Server",                    // 二进制类型
-  "build_time": "2026-02-08T10:44:02.848471700Z", // 构建时间
-  "cargo_target_triple": "x86_64-pc-windows-msvc", // 编译目标
-  "cargo_version": "0.0.1",                   // Cargo 版本号
-  "git_branch": "main",                       // Git 分支
-  "git_commit_date": "2026-02-08T07:25:09.000000000Z", // 提交日期
-  "git_commit_message": "Feat: ...",           // 提交信息
-  "git_commit_sha": "73d9589",                // 提交 SHA
-  "rustc_channel": "nightly",                 // Rust 编译器通道
-  "rustc_commit_date": "2025-12-30",          // Rust 编译器提交日期
-  "rustc_commit_hash": "0e8999942552691afc20495af6227eca8ab0af05", // Rust 编译器提交 Hash
-  "rustc_llvm_version": "21.1",               // LLVM 版本
-  "rustc_version": "1.94.0-nightly"           // Rust 版本
+  "binary_type": "Server",
+  // 二进制类型
+  "build_time": "2026-02-08T10:44:02.848471700Z",
+  // 构建时间
+  "cargo_target_triple": "x86_64-pc-windows-msvc",
+  // 编译目标
+  "cargo_version": "0.0.1",
+  // Cargo 版本号
+  "git_branch": "main",
+  // Git 分支
+  "git_commit_date": "2026-02-08T07:25:09.000000000Z",
+  // 提交日期
+  "git_commit_message": "Feat: ...",
+  // 提交信息
+  "git_commit_sha": "73d9589",
+  // 提交 SHA
+  "rustc_channel": "nightly",
+  // Rust 编译器通道
+  "rustc_commit_date": "2025-12-30",
+  // Rust 编译器提交日期
+  "rustc_commit_hash": "0e8999942552691afc20495af6227eca8ab0af05",
+  // Rust 编译器提交 Hash
+  "rustc_llvm_version": "21.1",
+  // LLVM 版本
+  "rustc_version": "1.94.0-nightly"
+  // Rust 版本
 }
 ```
 
@@ -82,7 +95,8 @@
 {
   "jsonrpc": "2.0",
   "method": "nodeget-server_version",
-  "params": [], // 无参数
+  "params": [],
+  // 无参数
   "id": 1
 }
 ```
@@ -135,7 +149,8 @@
 {
   "jsonrpc": "2.0",
   "method": "nodeget-server_uuid",
-  "params": [], // 无参数
+  "params": [],
+  // 无参数
   "id": 1
 }
 ```
@@ -145,7 +160,8 @@
 ```json
 {
   "jsonrpc": "2.0",
-  "result": "e8583352-39e8-5a5b-b66c-e450689088fd", // Server UUID
+  "result": "e8583352-39e8-5a5b-b66c-e450689088fd",
+  // Server UUID
   "id": 1
 }
 ```
@@ -162,7 +178,8 @@
 
 ```json
 {
-  "token": "demo_token" // Token 字符串
+  "token": "demo_token"
+  // Token 字符串
 }
 ```
 
@@ -228,7 +245,8 @@
 
 ```json
 {
-  "token": "SUPER_TOKEN_KEY:SUPER_TOKEN_SECRET" // SuperToken 字符串
+  "token": "SUPER_TOKEN_KEY:SUPER_TOKEN_SECRET"
+  // SuperToken 字符串
 }
 ```
 
@@ -265,7 +283,8 @@
 ```json
 {
   "jsonrpc": "2.0",
-  "result": "ws_listener = \"0.0.0.0:2211\"\\nserver_uuid = \"auto_gen\"\\n\\n[logging]\\nlog_filter = \"info\"\\n\\n[database]\\ndatabase_url = \"sqlite://nodeget.db?mode=rwc\"\\n...", // 配置文件原始文本
+  "result": "ws_listener = \"0.0.0.0:2211\"\\nserver_uuid = \"auto_gen\"\\n\\n[logging]\\nlog_filter = \"info\"\\n\\n[database]\\ndatabase_url = \"sqlite://nodeget.db?mode=rwc\"\\n...",
+  // 配置文件原始文本
   "id": 1
 }
 ```
@@ -280,8 +299,10 @@
 
 ```json
 {
-  "token": "SUPER_TOKEN_KEY:SUPER_TOKEN_SECRET", // SuperToken 字符串
-  "config_string": "ws_listener = \"0.0.0.0:2211\"\\n..."   // 完整的 TOML 配置文本
+  "token": "SUPER_TOKEN_KEY:SUPER_TOKEN_SECRET",
+  // SuperToken 字符串
+  "config_string": "ws_listener = \"0.0.0.0:2211\"\\n..."
+  // 完整的 TOML 配置文本
 }
 ```
 
@@ -325,7 +346,8 @@
 ```json
 {
   "jsonrpc": "2.0",
-  "result": true, // 写入成功
+  "result": true,
+  // 写入成功
   "id": 1
 }
 ```
@@ -340,7 +362,8 @@
 
 ```json
 {
-  "token": "SUPER_TOKEN_KEY:SUPER_TOKEN_SECRET" // SuperToken 字符串
+  "token": "SUPER_TOKEN_KEY:SUPER_TOKEN_SECRET"
+  // SuperToken 字符串
 }
 ```
 
@@ -511,8 +534,10 @@
 
 ```json
 {
-  "token": "SUPER_TOKEN_KEY:SUPER_TOKEN_SECRET", // SuperToken 字符串
-  "log_filter": "info,rpc=debug,db=trace"        // 日志过滤规则，语法同 RUST_LOG
+  "token": "SUPER_TOKEN_KEY:SUPER_TOKEN_SECRET",
+  // SuperToken 字符串
+  "log_filter": "info,rpc=debug,db=trace"
+  // 日志过滤规则，语法同 RUST_LOG
 }
 ```
 
@@ -709,3 +734,87 @@ curl -X POST http://127.0.0.1:2211/jsonrpc \
 - 替换二进制前会自动备份原文件为 `<current>.old`
 - 重启使用 `execve` 覆盖当前进程，PID 不变，systemd 等外部管理器无感知
 - 更新失败时（如下载不完整、替换失败）不会重启，原进程继续运行
+
+## Exec SQL
+
+执行原始 SQL 语句，支持参数化查询，返回值统一转换为 JSON 格式。作用于**主数据库**（由 `database_url` 配置的数据库）。
+
+### 方法
+
+调用方法名为 `nodeget-server_exec_sql`，需要提供以下参数：
+
+```json
+{
+  "token": "demo_token",
+  "sql": "SELECT id, name FROM users WHERE age > ?",
+  "params": [
+    18
+  ]
+}
+```
+
+- `sql` (string): 要执行的原始 SQL 语句，支持所有 SQL 类型（SELECT/INSERT/UPDATE/DELETE/DDL/PRAGMA）
+- `params` (array, optional): 参数化查询的值数组，用于替换 SQL 中的占位符，默认为 `null`
+
+### 权限要求
+
+- Permission: `NodeGet::ExecSql`
+- Scope 行为:
+    - `Global` Scope 下拥有该权限: 可执行任意 SQL
+
+`token` 支持以下格式之一:
+
+- `token_key:token_secret`
+- `username|password`
+
+### 返回值
+
+统一返回以下 JSON 结构:
+
+```json
+{
+  "success": true,
+  "data": [],
+  "row_count": 0
+}
+```
+
+- `success` (boolean): 是否执行成功
+- `data` (array): SELECT 查询返回结果行的 JSON 数组；INSERT/UPDATE/DELETE/DDL 返回空数组 `[]`
+- `row_count` (number): SELECT 返回的行数，或 DML 语句的影响行数
+
+完整示例请参照上方格式构造 JSON-RPC 请求。如需对本地 SQLite 数据库实例执行 SQL 操作，请使用 [Db 命名空间](../db/index.md)。
+
+## Get Database Type
+
+获取当前节点使用的数据库后端类型。作用于**主数据库**（由 `database_url` 配置的数据库）。
+
+### 方法
+
+调用方法名为 `nodeget-server_get_database_type`，需要提供以下参数：
+
+```json
+{
+  "token": "demo_token"
+}
+```
+
+### 权限要求
+
+- Permission: `NodeGet::ExecSql`
+- Scope 行为:
+    - `Global` Scope 下拥有该权限: 可返回数据库类型
+
+`token` 支持以下格式之一:
+
+- `token_key:token_secret`
+- `username|password`
+
+### 返回值
+
+返回包含 `database_type` 字段的对象，可能的值为:
+
+- `"sqlite"`: 当前使用 SQLite 数据库
+- `"postgres"`: 当前使用 PostgreSQL 数据库
+
+如需查询由 `db` 命名空间管理的实例数据库类型，请使用 `db` 命名空间的 RPC 方法。

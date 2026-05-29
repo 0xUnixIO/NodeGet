@@ -30,7 +30,6 @@ mod delete_dynamic;
 mod delete_dynamic_summary;
 mod delete_static;
 mod query_dynamic;
-mod query_dynamic_avg;
 mod query_dynamic_multi_last;
 pub mod query_dynamic_summary;
 mod query_dynamic_summary_avg;
@@ -39,17 +38,10 @@ mod query_dynamic_summary_buckets_multi;
 mod query_dynamic_summary_history_multi;
 mod query_dynamic_summary_multi_last;
 mod query_static;
-mod query_static_avg;
 mod query_static_multi_last;
 mod report_dynamic;
 mod report_dynamic_summary;
 mod report_static;
-
-/// Shared error counter for avg query error tracking
-static AVG_ERROR_COUNTER: AtomicU64 = AtomicU64::new(0);
-pub fn generate_avg_error_id() -> u64 {
-    AVG_ERROR_COUNTER.fetch_add(1, Ordering::Relaxed)
-}
 
 #[rpc(server, namespace = "agent")]
 pub trait Rpc {
@@ -79,20 +71,6 @@ pub trait Rpc {
         &self,
         token: String,
         dynamic_data_query: DynamicDataQuery,
-    ) -> RpcResult<Box<RawValue>>;
-
-    #[method(name = "query_static_avg")]
-    async fn query_static_avg(
-        &self,
-        token: String,
-        static_data_avg_query: StaticDataAvgQuery,
-    ) -> RpcResult<Box<RawValue>>;
-
-    #[method(name = "query_dynamic_avg")]
-    async fn query_dynamic_avg(
-        &self,
-        token: String,
-        dynamic_data_avg_query: DynamicDataAvgQuery,
     ) -> RpcResult<Box<RawValue>>;
 
     #[method(name = "static_data_multi_last_query")]
@@ -166,6 +144,7 @@ pub trait Rpc {
         token: String,
         query: DynamicSummaryBucketsMultiQuery,
     ) -> RpcResult<Box<RawValue>>;
+
 
     #[method(name = "dynamic_summary_multi_last_query")]
     async fn dynamic_summary_multi_last_query(
@@ -246,32 +225,6 @@ impl RpcServer for AgentRpcImpl {
         async { rpc_exec!(query_dynamic::query_dynamic(token, dynamic_data_query).await) }
             .instrument(span)
             .await
-    }
-
-    async fn query_static_avg(
-        &self,
-        token: String,
-        static_data_avg_query: StaticDataAvgQuery,
-    ) -> RpcResult<Box<RawValue>> {
-        let (tk, un) = token_identity(&token);
-        let span = tracing::info_span!(target: "monitoring", "agent::query_static_avg", token_key = tk, username = un, query = ?static_data_avg_query);
-        async { rpc_exec!(query_static_avg::query_static_avg(token, static_data_avg_query).await) }
-            .instrument(span)
-            .await
-    }
-
-    async fn query_dynamic_avg(
-        &self,
-        token: String,
-        dynamic_data_avg_query: DynamicDataAvgQuery,
-    ) -> RpcResult<Box<RawValue>> {
-        let (tk, un) = token_identity(&token);
-        let span = tracing::info_span!(target: "monitoring", "agent::query_dynamic_avg", token_key = tk, username = un, query = ?dynamic_data_avg_query);
-        async {
-            rpc_exec!(query_dynamic_avg::query_dynamic_avg(token, dynamic_data_avg_query).await)
-        }
-        .instrument(span)
-        .await
     }
 
     async fn static_data_multi_last_query(
@@ -423,6 +376,7 @@ impl RpcServer for AgentRpcImpl {
         .instrument(span)
         .await
     }
+
 
     async fn dynamic_summary_multi_last_query(
         &self,

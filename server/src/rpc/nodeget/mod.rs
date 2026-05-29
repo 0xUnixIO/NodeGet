@@ -17,6 +17,7 @@ use uuid::Uuid;
 
 pub mod config;
 pub mod database_storage;
+pub mod exec_sql;
 pub mod list_all_agent_uuid;
 pub mod log_query;
 pub mod self_update;
@@ -69,6 +70,17 @@ pub trait Rpc {
         unsubscribe = "unsubscribe_visitor_stats"
     )]
     async fn subscribe_visitor_stats(&self) -> SubscriptionResult;
+
+    #[method(name = "exec_sql")]
+    async fn exec_sql(
+        &self,
+        token: String,
+        sql: String,
+        params: Option<Value>,
+    ) -> RpcResult<Box<RawValue>>;
+
+    #[method(name = "get_database_type")]
+    async fn get_database_type(&self, token: String) -> RpcResult<Box<RawValue>>;
 }
 
 #[derive(Clone)]
@@ -363,5 +375,26 @@ impl RpcServer for NodegetServerRpcImpl {
         }
         .instrument(span)
         .await
+    }
+
+    async fn exec_sql(
+        &self,
+        token: String,
+        sql: String,
+        params: Option<Value>,
+    ) -> RpcResult<Box<RawValue>> {
+        let (tk, un) = token_identity(&token);
+        let span = tracing::info_span!(target: "server", "nodeget-server::exec_sql", token_key = tk, username = un, sql_len = sql.len());
+        async { rpc_exec!(exec_sql::exec_sql(token, sql, params).await) }
+            .instrument(span)
+            .await
+    }
+
+    async fn get_database_type(&self, token: String) -> RpcResult<Box<RawValue>> {
+        let (tk, un) = token_identity(&token);
+        let span = tracing::info_span!(target: "server", "nodeget-server::get_database_type", token_key = tk, username = un);
+        async { rpc_exec!(exec_sql::get_database_type(token).await) }
+            .instrument(span)
+            .await
     }
 }

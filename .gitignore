@@ -13,3 +13,6 @@ docs/.vitepress/dist
 docs/.vitepress/cache
 md.md
 test-py
+static
+rp.md
+rustest
