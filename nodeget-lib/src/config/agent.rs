@@ -168,7 +168,7 @@ impl AgentConfig {
 
     /// 从指定路径读取并解析代理配置
     ///
-    /// 若配置文件中 `agent_uuid` 为 `"auto_gen"`，则会生成随机 UUIDv4
+    /// 若配置文件中 `agent_uuid` 为 `"auto_gen"`，则会生成随机 `UUIDv4`
     /// 并直接覆盖原配置文件，后续启动不再触发自动生成。
     ///
     /// # Errors
@@ -184,7 +184,7 @@ impl AgentConfig {
         let is_auto_gen = value
             .get("agent_uuid")
             .and_then(|v| v.as_str())
-            .map_or(false, |s| s.eq_ignore_ascii_case("auto_gen"));
+            .is_some_and(|s| s.eq_ignore_ascii_case("auto_gen"));
 
         let config_content = if is_auto_gen {
             let new_uuid = uuid::Uuid::new_v4().to_string();

@@ -83,7 +83,7 @@ pub async fn self_update(tag: &str) -> bool {
 
     log::info!("Downloaded {} bytes", bytes.len());
 
-    if replace_binary(bytes.to_vec()) {
+    if replace_binary(&bytes) {
         log::info!("Binary replaced successfully: {}", current.display());
     } else {
         log::error!("Failed to replace binary");

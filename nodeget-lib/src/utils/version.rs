@@ -40,7 +40,7 @@ impl NodeGetVersion {
     // # 返回值
     // 返回包含当前构建版本信息的 NodeGetVersion 实例
     #[must_use]
-    pub fn get() -> Self {
+    pub const fn get() -> Self {
         Self {
             binary_type: {
                 if cfg!(feature = "for-server") {

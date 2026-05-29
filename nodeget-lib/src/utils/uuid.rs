@@ -1,7 +1,7 @@
 use crate::error::Result;
 use uuid::Uuid;
 
-/// 生成随机 UUIDv4
+/// 生成随机 `UUIDv4`
 ///
 /// # Errors
 ///

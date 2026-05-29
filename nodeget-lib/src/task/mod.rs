@@ -153,6 +153,7 @@ impl TaskEventType {
     /// 用于 Ping/TcpPing/HttpPing 任务
     ///
     /// 其他任务类型返回 `None`
+    #[must_use]
     pub fn result_from_duration(&self, duration: Duration) -> Option<TaskEventResult> {
         let millis = duration.as_secs_f64() * 1000.0;
         match self {

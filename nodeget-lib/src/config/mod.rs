@@ -23,9 +23,8 @@ where
         return Err(serde::de::Error::custom(
             "auto_gen is not supported here; use get_and_parse_config for auto-generation",
         ));
-    } else {
-        Uuid::parse_str(&s).map_err(serde::de::Error::custom)
     }
+    Uuid::parse_str(&s).map_err(serde::de::Error::custom)
 }
 
 /// 在 TOML 配置文本中查找并替换指定 key 的 `"auto_gen"` 值为新生成的 UUID。
@@ -50,29 +49,27 @@ fn replace_auto_gen_uuid(content: &str, key: &str, uuid: &str) -> String {
             .find(|c: char| c == '=' || c.is_ascii_whitespace())
             .unwrap_or(trimmed.len());
         // 使用 key 长度替代魔法数字，避免 key 改名时代码不同步
-        if key_end == key.len() && trimmed[..key_end].eq_ignore_ascii_case(key) {
-            if let Some(eq_pos) = line.find('=') {
-                let before = &line[..eq_pos + 1];
-                let after = &line[eq_pos + 1..];
-                let after_trimmed = after.trim_start();
-                if let Some(first_char) = after_trimmed.chars().next() {
-                    if first_char == '"' || first_char == '\'' {
-                        // first_char 是 ASCII 单字节字符， slicing at [1..] 安全
-                        let rest = &after_trimmed[1..];
-                        // 使用 get(..8) 替代直接索引，防止非 ASCII 边界 panic
-                        if rest
-                            .get(..8)
-                            .is_some_and(|s| s.eq_ignore_ascii_case("auto_gen"))
-                        {
-                            let after_value = &rest[8..];
-                            new_content.push_str(before);
-                            new_content.push(' ');
-                            new_content.push(first_char);
-                            new_content.push_str(uuid);
-                            new_content.push_str(after_value);
-                            new_content.push('\n');
-                            continue;
-                        }
+        if key_end == key.len() && trimmed[..key_end].eq_ignore_ascii_case(key) && let Some(eq_pos) = line.find('=') {
+            let before = &line[..=eq_pos];
+            let after = &line[eq_pos + 1..];
+            let after_trimmed = after.trim_start();
+            if let Some(first_char) = after_trimmed.chars().next() {
+                if first_char == '"' || first_char == '\'' {
+                    // first_char 是 ASCII 单字节字符， slicing at [1..] 安全
+                    let rest = &after_trimmed[1..];
+                    // 使用 get(..8) 替代直接索引，防止非 ASCII 边界 panic
+                    if rest
+                        .get(..8)
+                        .is_some_and(|s| s.eq_ignore_ascii_case("auto_gen"))
+                    {
+                        let after_value = &rest[8..];
+                        new_content.push_str(before);
+                        new_content.push(' ');
+                        new_content.push(first_char);
+                        new_content.push_str(uuid);
+                        new_content.push_str(after_value);
+                        new_content.push('\n');
+                        continue;
                     }
                 }
             }

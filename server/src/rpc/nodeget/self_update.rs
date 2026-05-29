@@ -79,7 +79,7 @@ pub async fn self_update(token: String, tag: String) -> RpcResult<()> {
         tracing::info!(target: "server", size = bytes.len(), "Update downloaded");
 
         // 5. Replace binary
-        if !nodeget_lib::self_update::replace_binary(bytes.to_vec()) {
+        if !nodeget_lib::self_update::replace_binary(&bytes) {
             return Err(NodegetError::Other("Failed to replace binary".to_owned()));
         }
 

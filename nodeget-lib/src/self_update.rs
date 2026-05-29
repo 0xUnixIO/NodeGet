@@ -160,19 +160,13 @@ pub fn canonical_exe_path() -> Option<std::path::PathBuf> {
 }
 
 pub fn check_if_update_needed(tag: &str) -> ((u32, u32, u32), (u32, u32, u32), bool) {
-    let target_version = match parse_version(tag) {
-        None => {
-            return ((0, 0, 0), (0, 0, 0), false);
-        }
-        Some(v) => v,
+    let Some(target_version) = parse_version(tag) else {
+        return ((0, 0, 0), (0, 0, 0), false);
     };
 
-    let current_version = match parse_version(&format!("v{}", NodeGetVersion::get().cargo_version))
-    {
-        None => {
-            return ((0, 0, 0), target_version, false);
-        }
-        Some(v) => v,
+    let cargo_version = NodeGetVersion::get().cargo_version;
+    let Some(current_version) = parse_version(&format!("v{cargo_version}")) else {
+        return ((0, 0, 0), target_version, false);
     };
 
     (
@@ -186,36 +180,31 @@ pub fn check_if_update_needed(tag: &str) -> ((u32, u32, u32), (u32, u32, u32), b
 fn build_release_url(arch_name: &[(&str, &str)], tag: &str) -> Option<String> {
     let arch_str = NodeGetVersion::get().cargo_target_triple;
 
-    let (_, binary_name) = match arch_name.iter().find(|(target, _)| *target == arch_str) {
-        Some(pair) => pair,
-        None => {
-            return None;
-        }
+    let Some((_, binary_name)) = arch_name.iter().find(|(target, _)| *target == arch_str) else {
+        return None;
     };
 
     Some(format!(
-        "https://install.nodeget.com/releases/{}?tag={}",
-        binary_name, tag
+        "https://install.nodeget.com/releases/{binary_name}?tag={tag}"
     ))
 }
 
 #[cfg(feature = "for-agent")]
+#[must_use]
 pub fn get_url(tag: &str) -> Option<String> {
     build_release_url(&ARCH_NAME, tag)
 }
 
 #[cfg(feature = "for-server")]
+#[must_use]
 pub fn get_server_url(tag: &str) -> Option<String> {
     build_release_url(&SERVER_ARCH_NAME, tag)
 }
 
-pub fn replace_binary(binary: Vec<u8>) -> bool {
-    let current = match canonical_exe_path() {
-        Some(p) => p,
-        None => {
-            tracing::error!("Failed to get canonical exe path for binary replacement");
-            return false;
-        }
+pub fn replace_binary(binary: &[u8]) -> bool {
+    let Some(current) = canonical_exe_path() else {
+        tracing::error!("Failed to get canonical exe path for binary replacement");
+        return false;
     };
 
     let mut backup = current.as_os_str().to_os_string();
@@ -226,7 +215,7 @@ pub fn replace_binary(binary: Vec<u8>) -> bool {
         return false;
     }
 
-    if std::fs::write(&current, &binary).is_err() {
+    if std::fs::write(&current, binary).is_err() {
         // Try to restore backup
         if let Err(e) = std::fs::rename(&backup, &current) {
             tracing::error!(error = %e, "Failed to restore backup during rollback");
