@@ -35,6 +35,19 @@ pub async fn crontab_task(
             }
         };
 
+        // task_event_type 只序列化一次，每次循环直接 clone JSON Value
+        let task_type_json = match serde_json::to_value(&task_event_type) {
+            Ok(v) => v,
+            Err(e) => {
+                error!(
+                    target: "crontab",
+                    error = %e,
+                    "failed to serialize task_event_type"
+                );
+                return;
+            }
+        };
+
         let agent_count = uuids.len();
         info!(
             target: "crontab",
@@ -43,91 +56,93 @@ pub async fn crontab_task(
             "dispatching task to agents"
         );
 
+        // 收集 crontab_result 日志，最后批量写入（减少 DB 往返：2n 次 → n+1 次）
+        let mut pending_logs: Vec<crontab_result::ActiveModel> = Vec::with_capacity(agent_count);
+        let run_time = Utc::now().timestamp_millis();
+
         for uuid in uuids {
-            let process_logic =
-                async {
-                    let token = generate_random_string(10);
+            let process_logic = async {
+                let token = generate_random_string(10);
 
-                    let in_data = task::ActiveModel {
-                        id: ActiveValue::default(),
-                        uuid: Set(uuid),
-                        token: Set(token.clone()),
-                        cron_source: Set(Some(cron_name.clone())),
-                        timestamp: Set(None),
-                        success: Set(None),
-                        error_message: Set(None),
-                        task_event_type: TaskRpcImpl::try_set_json(task_event_type.clone())
-                            .map_err(|e| NodegetError::SerializationError(format!("{e}")))?,
-                        task_event_result: Set(None),
-                    };
+                let in_data = task::ActiveModel {
+                    id: ActiveValue::default(),
+                    uuid: Set(uuid),
+                    token: Set(token.clone()),
+                    cron_source: Set(Some(cron_name.clone())),
+                    timestamp: Set(None),
+                    success: Set(None),
+                    error_message: Set(None),
+                    // 直接 clone 已序列化好的 JSON，避免重复序列化
+                    task_event_type: Set(task_type_json.clone()),
+                    task_event_result: Set(None),
+                };
 
-                    let result = task::Entity::insert(in_data).exec(db).await.map_err(|e| {
+                let result = task::Entity::insert(in_data).exec(db).await.map_err(|e| {
+                    error!(
+                        target: "crontab",
+                        agent_uuid = %uuid,
+                        error = %e,
+                        "database insert error"
+                    );
+                    NodegetError::DatabaseError(format!("Database insert error: {e}"))
+                })?;
+
+                let task_id = result.last_insert_id;
+                debug!(
+                    target: "crontab",
+                    agent_uuid = %uuid,
+                    task_id,
+                    "task record inserted"
+                );
+
+                let task = TaskEvent {
+                    task_id: task_id.cast_unsigned(),
+                    task_token: token,
+                    task_event_type: task_event_type.clone(),
+                };
+
+                let manager = TaskManager::global();
+
+                match manager.send_event(uuid, task).await {
+                    Ok(()) => {
+                        info!(
+                            target: "crontab",
+                            agent_uuid = %uuid,
+                            task_id,
+                            "task event sent to agent"
+                        );
+                        Ok(task_id)
+                    }
+                    Err(e) => {
+                        let _ = task::Entity::delete_by_id(task_id).exec(db).await.map_err(
+                            |del_err| {
+                                error!(
+                                    target: "crontab",
+                                    agent_uuid = %uuid,
+                                    task_id,
+                                    error = %del_err,
+                                    "database delete error during rollback"
+                                );
+                                NodegetError::DatabaseError(format!(
+                                    "Database delete error: {del_err}"
+                                ))
+                            },
+                        );
                         error!(
                             target: "crontab",
                             agent_uuid = %uuid,
-                            error = %e,
-                            "database insert error"
+                            task_id,
+                            error = %e.1,
+                            "failed to send task event to agent"
                         );
-                        NodegetError::DatabaseError(format!("Database insert error: {e}"))
-                    })?;
-
-                    let task_id = result.last_insert_id;
-                    debug!(
-                        target: "crontab",
-                        agent_uuid = %uuid,
-                        task_id,
-                        "task record inserted"
-                    );
-
-                    let task = TaskEvent {
-                        task_id: task_id.cast_unsigned(),
-                        task_token: token,
-                        task_event_type: task_event_type.clone(),
-                    };
-
-                    let manager = TaskManager::global();
-
-                    match manager.send_event(uuid, task).await {
-                        Ok(()) => {
-                            info!(
-                                target: "crontab",
-                                agent_uuid = %uuid,
-                                task_id,
-                                "task event sent to agent"
-                            );
-                            Ok(task_id)
-                        }
-                        Err(e) => {
-                            let _ = task::Entity::delete_by_id(task_id).exec(db).await.map_err(
-                                |del_err| {
-                                    error!(
-                                        target: "crontab",
-                                        agent_uuid = %uuid,
-                                        task_id,
-                                        error = %del_err,
-                                        "database delete error during rollback"
-                                    );
-                                    NodegetError::DatabaseError(format!(
-                                        "Database delete error: {del_err}"
-                                    ))
-                                },
-                            );
-                            error!(
-                                target: "crontab",
-                                agent_uuid = %uuid,
-                                task_id,
-                                error = %e.1,
-                                "failed to send task event to agent"
-                            );
-                            Err(NodegetError::AgentConnectionError(format!(
-                                "Error sending task event: {}",
-                                e.1
-                            )))
-                        }
+                        Err(NodegetError::AgentConnectionError(format!(
+                            "Error sending task event: {}",
+                            e.1
+                        )))
                     }
-                };
+                }
+            };
 
-            // 执行逻辑并获取结果状态
             let (success, message, task_id) = match process_logic.await {
                 Ok(new_id) => (
                     true,
@@ -149,22 +164,28 @@ pub async fn crontab_task(
                 }
             };
 
-            let crontab_log = crontab_result::ActiveModel {
+            pending_logs.push(crontab_result::ActiveModel {
                 id: ActiveValue::NotSet,
                 cron_id: Set(cron_id),
                 cron_name: Set(cron_name.clone()),
                 relative_id: Set(task_id),
-                run_time: Set(Some(Utc::now().timestamp_millis())),
+                run_time: Set(Some(run_time)),
                 success: Set(Some(success)),
                 message: Set(Some(message)),
-            };
+            });
+        }
 
-            if let Err(e) = crontab_result::Entity::insert(crontab_log).exec(db).await {
+        // 批量写入所有 crontab_result，30 条只需 1 次 DB 往返
+        if !pending_logs.is_empty() {
+            if let Err(e) = crontab_result::Entity::insert_many(pending_logs)
+                .exec(db)
+                .await
+            {
                 error!(
                     target: "crontab",
-                    agent_uuid = %uuid,
+                    cron_id,
                     error = %e,
-                    "failed to save crontab_result"
+                    "failed to batch save crontab_result"
                 );
             }
         }
