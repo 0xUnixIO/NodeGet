@@ -20,11 +20,7 @@ impl MigrationTrait for Migration {
                             .primary_key(),
                     )
                     .col(ColumnDef::new(VisitLog::Ip).string().not_null())
-                    .col(
-                        ColumnDef::new(VisitLog::VisitedAt)
-                            .big_integer()
-                            .not_null(),
-                    )
+                    .col(ColumnDef::new(VisitLog::VisitedAt).big_integer().not_null())
                     .to_owned(),
             )
             .await?;
