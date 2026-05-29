@@ -149,8 +149,9 @@ fn should_update(target: (u32, u32, u32), current: (u32, u32, u32)) -> bool {
 }
 
 /// 获取当前进程对应的“原”二进制路径：
-/// 如果 current_exe() 因为之前的 self_update rename 而指向 .old / .old.old …
+/// 如果 `current_exe()` 因为之前的 `self_update` rename 而指向 .old / .old.old …
 /// 则把所有末尾的 .old extension 剥掉，确保始终指向用户真正启动的那个文件。
+#[must_use]
 pub fn canonical_exe_path() -> Option<std::path::PathBuf> {
     let mut path = std::env::current_exe().ok()?;
     while path.extension() == Some(std::ffi::OsStr::new("old")) {
@@ -159,6 +160,7 @@ pub fn canonical_exe_path() -> Option<std::path::PathBuf> {
     Some(path)
 }
 
+#[must_use]
 pub fn check_if_update_needed(tag: &str) -> ((u32, u32, u32), (u32, u32, u32), bool) {
     let Some(target_version) = parse_version(tag) else {
         return ((0, 0, 0), (0, 0, 0), false);
@@ -180,9 +182,7 @@ pub fn check_if_update_needed(tag: &str) -> ((u32, u32, u32), (u32, u32, u32), b
 fn build_release_url(arch_name: &[(&str, &str)], tag: &str) -> Option<String> {
     let arch_str = NodeGetVersion::get().cargo_target_triple;
 
-    let Some((_, binary_name)) = arch_name.iter().find(|(target, _)| *target == arch_str) else {
-        return None;
-    };
+    let (_, binary_name) = arch_name.iter().find(|(target, _)| *target == arch_str)?;
 
     Some(format!(
         "https://install.nodeget.com/releases/{binary_name}?tag={tag}"
