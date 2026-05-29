@@ -10,10 +10,10 @@ use nodeget_lib::monitoring::data_structure::{
     DynamicMonitoringData, DynamicMonitoringSummaryData, StaticMonitoringData,
 };
 use nodeget_lib::monitoring::query::{
-    DynamicDataAvgQuery, DynamicDataQuery, DynamicDataQueryField, DynamicSummaryAvgQuery,
+    DynamicDataQuery, DynamicDataQueryField, DynamicSummaryAvgQuery,
     DynamicSummaryBucketsMultiQuery, DynamicSummaryBucketsQuery, DynamicSummaryHistoryMultiQuery,
-    DynamicSummaryQuery, DynamicSummaryQueryField, QueryCondition, StaticDataAvgQuery,
-    StaticDataQuery, StaticDataQueryField,
+    DynamicSummaryQuery, DynamicSummaryQueryField, QueryCondition, StaticDataQuery,
+    StaticDataQueryField,
 };
 use nodeget_lib::permission::data_structure::{DynamicMonitoringSummary, Permission, Scope};
 use nodeget_lib::permission::token_auth::TokenOrAuth;
