@@ -25,6 +25,12 @@ use tokio::sync::mpsc;
 use tracing::Instrument;
 use uuid::Uuid;
 
+/// 用于 avg 查询的错误计数器，生成可追踪的错误 ID
+static AVG_ERROR_COUNTER: AtomicU64 = AtomicU64::new(0);
+pub fn generate_avg_error_id() -> u64 {
+    AVG_ERROR_COUNTER.fetch_add(1, Ordering::Relaxed)
+}
+
 mod delete_common;
 mod delete_dynamic;
 mod delete_dynamic_summary;
