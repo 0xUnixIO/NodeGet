@@ -5,15 +5,16 @@ use std::os::fd::RawFd;
 use std::ptr;
 
 const SOCK_DIAG_BY_FAMILY: u16 = 20;
-const ALL_TCP_STATES: u32 = 0xffffffff;
+const ALL_TCP_STATES: u32 = 0xffff_ffff;
 const TCP_ESTABLISHED: u32 = 1;
 const NLMSG_HDRLEN: usize = size_of::<libc::nlmsghdr>();
 
-/// ---- C structures aligned with kernel ----
+// ---- C structures aligned with kernel ----
 
 // from linux/inet_diag.h
 #[repr(C)]
 #[derive(Clone, Copy)]
+#[allow(clippy::struct_field_names)]
 struct InetDiagSockId {
     idiag_sport: u16,
     idiag_dport: u16,
@@ -69,7 +70,7 @@ pub fn connections_count_with_protocol(family: u8, protocol: u8) -> io::Result<u
     }
 
     // Serialize into a Netlink message (header + payload)
-    let msg = serialize_netlink_message(&hdr, &req)?;
+    let msg = serialize_netlink_message(&hdr, &req);
 
     // Send and only count the number of returned messages
     netlink_inet_diag_only_count(&msg)
@@ -91,10 +92,10 @@ fn netlink_inet_diag_only_count(request: &[u8]) -> io::Result<u64> {
     let ret = unsafe {
         sendto(
             fd,
-            request.as_ptr() as *const c_void,
+            request.as_ptr().cast::<c_void>(),
             request.len(),
             0,
-            &addr as *const sockaddr_nl as *const sockaddr,
+            (&raw const addr).cast::<sockaddr>(),
             size_of::<sockaddr_nl>() as u32,
         )
     };
@@ -118,7 +119,7 @@ fn netlink_inet_diag_only_count(request: &[u8]) -> io::Result<u64> {
         let nr = unsafe {
             recvfrom(
                 fd,
-                buf.as_mut_ptr() as *mut c_void,
+                buf.as_mut_ptr().cast::<c_void>(),
                 buf.len(),
                 0,
                 ptr::null_mut(),
@@ -186,6 +187,7 @@ fn netlink_message_header(b: &[u8]) -> io::Result<(usize, bool)> {
     // targets (e.g. ARMv7) a direct reference cast could produce SIGBUS.
     let h: libc::nlmsghdr = unsafe { ptr::read_unaligned(b.as_ptr().cast::<libc::nlmsghdr>()) };
     let len = h.nlmsg_len as usize;
+    #[allow(clippy::cast_possible_wrap)]
     let l = nlm_align_of(len as i32) as usize;
 
     if len < NLMSG_HDRLEN || l > b.len() {
@@ -201,12 +203,12 @@ fn netlink_message_header(b: &[u8]) -> io::Result<(usize, bool)> {
 
 /// Align to 4 bytes
 #[inline]
-fn nlm_align_of(msglen: i32) -> i32 {
+const fn nlm_align_of(msglen: i32) -> i32 {
     (msglen + libc::NLA_ALIGNTO - 1) & !(libc::NLA_ALIGNTO - 1)
 }
 
 /// Serialize (header, payload) into a Netlink message (fill back header.len)
-fn serialize_netlink_message(hdr: &libc::nlmsghdr, req: &InetDiagReqV2) -> io::Result<Vec<u8>> {
+fn serialize_netlink_message(hdr: &libc::nlmsghdr, req: &InetDiagReqV2) -> Vec<u8> {
     let total = NLMSG_HDRLEN + size_of::<InetDiagReqV2>();
     let mut msg = vec![0u8; total];
 
@@ -216,20 +218,16 @@ fn serialize_netlink_message(hdr: &libc::nlmsghdr, req: &InetDiagReqV2) -> io::R
 
     unsafe {
         // header
-        ptr::copy_nonoverlapping(
-            &h as *const libc::nlmsghdr as *const u8,
-            msg.as_mut_ptr(),
-            NLMSG_HDRLEN,
-        );
+        ptr::copy_nonoverlapping((&raw const h).cast::<u8>(), msg.as_mut_ptr(), NLMSG_HDRLEN);
         // payload
         ptr::copy_nonoverlapping(
-            req as *const InetDiagReqV2 as *const u8,
+            (&raw const *req).cast::<u8>(),
             msg.as_mut_ptr().add(NLMSG_HDRLEN),
             size_of::<InetDiagReqV2>(),
         );
     }
 
-    Ok(msg)
+    msg
 }
 
 /// Simple FD guard
