@@ -288,6 +288,7 @@ pub struct DynamicSummaryQuery {
     pub condition: Vec<QueryCondition>,
 }
 
+
 // 动态监控摘要平均值查询结构体
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DynamicSummaryAvgQuery {

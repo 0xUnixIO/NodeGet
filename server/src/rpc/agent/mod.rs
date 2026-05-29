@@ -12,9 +12,8 @@ use nodeget_lib::monitoring::data_structure::{
 use nodeget_lib::monitoring::query::{
     DynamicDataAvgQuery, DynamicDataQuery, DynamicDataQueryField, DynamicSummaryAvgQuery,
     DynamicSummaryBucketsMultiQuery, DynamicSummaryBucketsQuery, DynamicSummaryHistoryMultiQuery,
-    DynamicSummaryQuery,
-    DynamicSummaryQueryField, QueryCondition, StaticDataAvgQuery, StaticDataQuery,
-    StaticDataQueryField,
+    DynamicSummaryQuery, DynamicSummaryQueryField, QueryCondition, StaticDataAvgQuery,
+    StaticDataQuery, StaticDataQueryField,
 };
 use nodeget_lib::permission::data_structure::{DynamicMonitoringSummary, Permission, Scope};
 use nodeget_lib::permission::token_auth::TokenOrAuth;
@@ -150,7 +149,6 @@ pub trait Rpc {
         token: String,
         query: DynamicSummaryBucketsMultiQuery,
     ) -> RpcResult<Box<RawValue>>;
-
 
     #[method(name = "dynamic_summary_multi_last_query")]
     async fn dynamic_summary_multi_last_query(
@@ -382,7 +380,6 @@ impl RpcServer for AgentRpcImpl {
         .instrument(span)
         .await
     }
-
 
     async fn dynamic_summary_multi_last_query(
         &self,
