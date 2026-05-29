@@ -28,9 +28,9 @@ pub(crate) mod monitoring_buffer;
 pub(crate) mod monitoring_uuid_cache;
 mod rpc_timing;
 mod static_file;
-mod ws_counter;
 pub(crate) mod static_hash_cache;
 pub(crate) mod token;
+mod ws_counter;
 
 pub(crate) mod db_registry;
 pub(crate) mod monitoring_last_cache;

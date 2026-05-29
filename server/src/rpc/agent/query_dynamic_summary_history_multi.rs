@@ -42,9 +42,7 @@ pub async fn query_dynamic_summary_history_multi(
             .into());
         }
         if query.from >= query.to {
-            return Err(
-                NodegetError::InvalidInput("from must be less than to".to_owned()).into(),
-            );
+            return Err(NodegetError::InvalidInput("from must be less than to".to_owned()).into());
         }
 
         let token_or_auth = TokenOrAuth::from_full_token(&token)
@@ -135,10 +133,29 @@ fn add_all_columns(
 ) -> sea_orm::Select<dynamic_monitoring_summary::Entity> {
     use DynamicSummaryQueryField::*;
     [
-        CpuUsage, GpuUsage, UsedSwap, TotalSwap, UsedMemory, TotalMemory, AvailableMemory,
-        LoadOne, LoadFive, LoadFifteen, Uptime, BootTime, ProcessCount, TotalSpace,
-        AvailableSpace, ReadSpeed, WriteSpeed, TcpConnections, UdpConnections, TotalReceived,
-        TotalTransmitted, TransmitSpeed, ReceiveSpeed,
+        CpuUsage,
+        GpuUsage,
+        UsedSwap,
+        TotalSwap,
+        UsedMemory,
+        TotalMemory,
+        AvailableMemory,
+        LoadOne,
+        LoadFive,
+        LoadFifteen,
+        Uptime,
+        BootTime,
+        ProcessCount,
+        TotalSpace,
+        AvailableSpace,
+        ReadSpeed,
+        WriteSpeed,
+        TcpConnections,
+        UdpConnections,
+        TotalReceived,
+        TotalTransmitted,
+        TransmitSpeed,
+        ReceiveSpeed,
     ]
     .iter()
     .fold(q, |acc, f| acc.column(field_to_column(f)))

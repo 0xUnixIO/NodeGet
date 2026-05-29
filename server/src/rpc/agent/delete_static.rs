@@ -62,12 +62,10 @@ pub async fn delete_static(
                             );
                         }
                         ResolvedCondition::TimestampFrom(start) => {
-                            query = query
-                                .filter(static_monitoring::Column::Timestamp.gte(*start));
+                            query = query.filter(static_monitoring::Column::Timestamp.gte(*start));
                         }
                         ResolvedCondition::TimestampTo(end) => {
-                            query =
-                                query.filter(static_monitoring::Column::Timestamp.lte(*end));
+                            query = query.filter(static_monitoring::Column::Timestamp.lte(*end));
                         }
                         ResolvedCondition::StorageTimeFromTo(start, end) => {
                             query = query.filter(
@@ -77,12 +75,11 @@ pub async fn delete_static(
                             );
                         }
                         ResolvedCondition::StorageTimeFrom(start) => {
-                            query = query
-                                .filter(static_monitoring::Column::StorageTime.gte(*start));
+                            query =
+                                query.filter(static_monitoring::Column::StorageTime.gte(*start));
                         }
                         ResolvedCondition::StorageTimeTo(end) => {
-                            query = query
-                                .filter(static_monitoring::Column::StorageTime.lte(*end));
+                            query = query.filter(static_monitoring::Column::StorageTime.lte(*end));
                         }
                     }
                 }
@@ -136,12 +133,10 @@ pub async fn delete_static(
                             );
                         }
                         ResolvedCondition::TimestampFrom(start) => {
-                            query = query
-                                .filter(static_monitoring::Column::Timestamp.gte(*start));
+                            query = query.filter(static_monitoring::Column::Timestamp.gte(*start));
                         }
                         ResolvedCondition::TimestampTo(end) => {
-                            query =
-                                query.filter(static_monitoring::Column::Timestamp.lte(*end));
+                            query = query.filter(static_monitoring::Column::Timestamp.lte(*end));
                         }
                         ResolvedCondition::StorageTimeFromTo(start, end) => {
                             query = query.filter(
@@ -151,12 +146,11 @@ pub async fn delete_static(
                             );
                         }
                         ResolvedCondition::StorageTimeFrom(start) => {
-                            query = query
-                                .filter(static_monitoring::Column::StorageTime.gte(*start));
+                            query =
+                                query.filter(static_monitoring::Column::StorageTime.gte(*start));
                         }
                         ResolvedCondition::StorageTimeTo(end) => {
-                            query = query
-                                .filter(static_monitoring::Column::StorageTime.lte(*end));
+                            query = query.filter(static_monitoring::Column::StorageTime.lte(*end));
                         }
                     }
                 }

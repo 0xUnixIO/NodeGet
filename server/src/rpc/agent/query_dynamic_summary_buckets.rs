@@ -35,14 +35,10 @@ pub async fn query_dynamic_summary_buckets(
         );
 
         if query.buckets == 0 {
-            return Err(
-                NodegetError::InvalidInput("buckets must be >= 1".to_owned()).into(),
-            );
+            return Err(NodegetError::InvalidInput("buckets must be >= 1".to_owned()).into());
         }
         if query.from >= query.to {
-            return Err(
-                NodegetError::InvalidInput("from must be less than to".to_owned()).into(),
-            );
+            return Err(NodegetError::InvalidInput("from must be less than to".to_owned()).into());
         }
 
         let token_or_auth = TokenOrAuth::from_full_token(&token)
@@ -99,9 +95,8 @@ pub async fn query_dynamic_summary_buckets(
             })?;
 
         let json = row.map_or(Value::Array(Vec::new()), |r| r.data);
-        let json_str = serde_json::to_string(&json).map_err(|e| {
-            NodegetError::SerializationError(format!("Serialization failed: {e}"))
-        })?;
+        let json_str = serde_json::to_string(&json)
+            .map_err(|e| NodegetError::SerializationError(format!("Serialization failed: {e}")))?;
 
         RawValue::from_string(json_str)
             .map_err(|e| NodegetError::SerializationError(format!("RawValue error: {e}")).into())
@@ -131,12 +126,10 @@ fn ensure_postgres(db: &DatabaseConnection) -> anyhow::Result<()> {
     if db.get_database_backend() == DatabaseBackend::Postgres {
         return Ok(());
     }
-    Err(
-        NodegetError::InvalidInput(
-            "agent_query_dynamic_summary_buckets only supports PostgreSQL".to_owned(),
-        )
-        .into(),
+    Err(NodegetError::InvalidInput(
+        "agent_query_dynamic_summary_buckets only supports PostgreSQL".to_owned(),
     )
+    .into())
 }
 
 fn build_sql(fields: &[DynamicSummaryQueryField]) -> String {
@@ -168,7 +161,13 @@ fn build_sql(fields: &[DynamicSummaryQueryField]) -> String {
 
     // jsonb_build_object：字段键值对
     let json_fields = fields.iter().fold(String::new(), |mut s, f| {
-        write!(s, ", '{key}', {col}", key = f.json_key(), col = f.column_name()).unwrap();
+        write!(
+            s,
+            ", '{key}', {col}",
+            key = f.json_key(),
+            col = f.column_name()
+        )
+        .unwrap();
         s
     });
 

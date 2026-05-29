@@ -306,8 +306,7 @@ pub async fn run(config: &nodeget_lib::config::server::ServerConfig) {
                 .and_hms_opt(0, 0, 0)
                 .unwrap()
                 .and_utc();
-            let sleep_secs =
-                (tomorrow_midnight.timestamp() - now.timestamp()).max(60) as u64;
+            let sleep_secs = (tomorrow_midnight.timestamp() - now.timestamp()).max(60) as u64;
             tokio::time::sleep(std::time::Duration::from_secs(sleep_secs)).await;
             if let Some(db) = crate::DB.get() {
                 crate::visitor_stats::aggregate_past_days(db).await;

@@ -37,10 +37,12 @@ pub async fn query_dynamic_summary_buckets_multi(
         );
 
         if query.uuids.is_empty() {
-            let json_str = serde_json::to_string(&Value::Array(Vec::new()))
-                .map_err(|e| NodegetError::SerializationError(format!("Serialization failed: {e}")))?;
-            return RawValue::from_string(json_str)
-                .map_err(|e| NodegetError::SerializationError(format!("RawValue error: {e}")).into());
+            let json_str = serde_json::to_string(&Value::Array(Vec::new())).map_err(|e| {
+                NodegetError::SerializationError(format!("Serialization failed: {e}"))
+            })?;
+            return RawValue::from_string(json_str).map_err(|e| {
+                NodegetError::SerializationError(format!("RawValue error: {e}")).into()
+            });
         }
         if query.uuids.len() > MAX_UUIDS {
             return Err(NodegetError::InvalidInput(format!(
@@ -49,14 +51,10 @@ pub async fn query_dynamic_summary_buckets_multi(
             .into());
         }
         if query.buckets == 0 {
-            return Err(
-                NodegetError::InvalidInput("buckets must be >= 1".to_owned()).into(),
-            );
+            return Err(NodegetError::InvalidInput("buckets must be >= 1".to_owned()).into());
         }
         if query.from >= query.to {
-            return Err(
-                NodegetError::InvalidInput("from must be less than to".to_owned()).into(),
-            );
+            return Err(NodegetError::InvalidInput("from must be less than to".to_owned()).into());
         }
 
         let token_or_auth = TokenOrAuth::from_full_token(&token)
@@ -104,11 +102,8 @@ pub async fn query_dynamic_summary_buckets_multi(
 
         let sql = build_sql(&query.fields, &placeholders);
 
-        let mut values: Vec<sea_orm::Value> = vec![
-            query.from.into(),
-            query.to.into(),
-            buckets_i64.into(),
-        ];
+        let mut values: Vec<sea_orm::Value> =
+            vec![query.from.into(), query.to.into(), buckets_i64.into()];
         for &id in &uuid_ids {
             values.push(id.into());
         }
@@ -124,9 +119,8 @@ pub async fn query_dynamic_summary_buckets_multi(
             })?;
 
         let json = row.map_or(Value::Array(Vec::new()), |r| r.data);
-        let json_str = serde_json::to_string(&json).map_err(|e| {
-            NodegetError::SerializationError(format!("Serialization failed: {e}"))
-        })?;
+        let json_str = serde_json::to_string(&json)
+            .map_err(|e| NodegetError::SerializationError(format!("Serialization failed: {e}")))?;
 
         RawValue::from_string(json_str)
             .map_err(|e| NodegetError::SerializationError(format!("RawValue error: {e}")).into())
@@ -156,12 +150,10 @@ fn ensure_postgres(db: &DatabaseConnection) -> anyhow::Result<()> {
     if db.get_database_backend() == DatabaseBackend::Postgres {
         return Ok(());
     }
-    Err(
-        NodegetError::InvalidInput(
-            "agent_query_dynamic_summary_buckets_multi only supports PostgreSQL".to_owned(),
-        )
-        .into(),
+    Err(NodegetError::InvalidInput(
+        "agent_query_dynamic_summary_buckets_multi only supports PostgreSQL".to_owned(),
     )
+    .into())
 }
 
 fn build_sql(fields: &[DynamicSummaryQueryField], uuid_placeholders: &str) -> String {
@@ -191,7 +183,13 @@ fn build_sql(fields: &[DynamicSummaryQueryField], uuid_placeholders: &str) -> St
     });
 
     let json_fields = fields.iter().fold(String::new(), |mut s, f| {
-        write!(s, ", '{key}', {col}", key = f.json_key(), col = f.column_name()).unwrap();
+        write!(
+            s,
+            ", '{key}', {col}",
+            key = f.json_key(),
+            col = f.column_name()
+        )
+        .unwrap();
         s
     });
 

@@ -17,10 +17,7 @@ fn escape_like_pattern(pattern: &str) -> String {
     pattern.replace('%', r"\%").replace('_', r"\_")
 }
 
-pub async fn query_latest_per_node(
-    token: String,
-    task_type: String,
-) -> RpcResult<Box<RawValue>> {
+pub async fn query_latest_per_node(token: String, task_type: String) -> RpcResult<Box<RawValue>> {
     let process_logic = async {
         debug!(target: "task", task_type = %task_type, "processing query_latest_per_node request");
 
@@ -45,8 +42,7 @@ pub async fn query_latest_per_node(
 
         // 构建类型过滤条件，与 query.rs 的处理方式保持一致
         let type_condition = if db.get_database_backend() == DbBackend::Postgres {
-            Expr::col(task::Column::TaskEventType)
-                .binary(BinOper::Custom("?"), task_type.clone())
+            Expr::col(task::Column::TaskEventType).binary(BinOper::Custom("?"), task_type.clone())
         } else {
             let escaped = escape_like_pattern(&task_type);
             let pattern = format!("%\"{escaped}\":%");
@@ -122,9 +118,8 @@ pub async fn query_latest_per_node(
         output_buffer.push(b']');
         debug!(target: "task", result_count, "query_latest_per_node completed");
 
-        let json_string = String::from_utf8(output_buffer).map_err(|e| {
-            NodegetError::SerializationError(format!("UTF8 conversion error: {e}"))
-        })?;
+        let json_string = String::from_utf8(output_buffer)
+            .map_err(|e| NodegetError::SerializationError(format!("UTF8 conversion error: {e}")))?;
 
         RawValue::from_string(json_string)
             .map_err(|e| NodegetError::SerializationError(format!("RawValue error: {e}")).into())

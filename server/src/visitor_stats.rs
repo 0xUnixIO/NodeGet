@@ -115,30 +115,29 @@ pub async fn compute_stats(db: &DatabaseConnection) -> Option<VisitorStatsRespon
     // 昨日统计
     let yesterday_start = today_start - 86400;
     let yesterday_date = ts_to_date_str(yesterday_start);
-    let (yesterday_pv, yesterday_uv) =
-        match visit_daily_stats::Entity::find_by_id(&yesterday_date)
-            .one(db)
-            .await
-            .unwrap_or(None)
-        {
-            Some(m) => (m.total_count.max(0) as u64, m.uv_count.max(0) as u64),
-            None => {
-                // 聚合任务尚未运行时从 visit_log 实时计算
-                let yesterday_records = visit_log::Entity::find()
-                    .filter(visit_log::Column::VisitedAt.gte(yesterday_start))
-                    .filter(visit_log::Column::VisitedAt.lt(today_start))
-                    .all(db)
-                    .await
-                    .unwrap_or_default();
-                let pv = yesterday_records.len() as u64;
-                let uv = yesterday_records
-                    .iter()
-                    .map(|r| r.ip.as_str())
-                    .collect::<std::collections::HashSet<_>>()
-                    .len() as u64;
-                (pv, uv)
-            }
-        };
+    let (yesterday_pv, yesterday_uv) = match visit_daily_stats::Entity::find_by_id(&yesterday_date)
+        .one(db)
+        .await
+        .unwrap_or(None)
+    {
+        Some(m) => (m.total_count.max(0) as u64, m.uv_count.max(0) as u64),
+        None => {
+            // 聚合任务尚未运行时从 visit_log 实时计算
+            let yesterday_records = visit_log::Entity::find()
+                .filter(visit_log::Column::VisitedAt.gte(yesterday_start))
+                .filter(visit_log::Column::VisitedAt.lt(today_start))
+                .all(db)
+                .await
+                .unwrap_or_default();
+            let pv = yesterday_records.len() as u64;
+            let uv = yesterday_records
+                .iter()
+                .map(|r| r.ip.as_str())
+                .collect::<std::collections::HashSet<_>>()
+                .len() as u64;
+            (pv, uv)
+        }
+    };
 
     // 最近 14 天趋势：从 all_daily 中取，按日期升序排列，最后追加今日
     let today_date = ts_to_date_str(today_start);
@@ -224,7 +223,10 @@ pub async fn record_handler(
         return axum::http::Response::builder()
             .status(StatusCode::NO_CONTENT)
             .header(axum::http::header::ACCESS_CONTROL_ALLOW_ORIGIN, "*")
-            .header(axum::http::header::ACCESS_CONTROL_ALLOW_METHODS, "POST, OPTIONS")
+            .header(
+                axum::http::header::ACCESS_CONTROL_ALLOW_METHODS,
+                "POST, OPTIONS",
+            )
             .header(axum::http::header::ACCESS_CONTROL_ALLOW_HEADERS, "*")
             .body(jsonrpsee::server::HttpBody::default())
             .expect("构建 CORS 响应失败");
