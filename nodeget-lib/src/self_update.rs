@@ -248,6 +248,9 @@ pub fn restart_process() -> ! {
 }
 
 #[cfg(unix)]
+/// # Panics
+///
+/// 若进程路径含非 UTF-8 字符或含空字节（null byte）时会 panic。
 pub fn restart_process_with_exec_v() -> ! {
     use std::ffi::CString;
     use std::os::raw::c_char;
