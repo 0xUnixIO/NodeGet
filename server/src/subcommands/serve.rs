@@ -82,6 +82,11 @@ pub async fn run(config: &nodeget_lib::config::server::ServerConfig) {
                 .max_connections(config.jsonrpc_max_connections.unwrap_or(100))
                 .max_response_body_size(config.max_response_body_size.unwrap_or(100 * 1024 * 1024))
                 .max_request_body_size(config.max_request_body_size.unwrap_or(10 * 1024 * 1024))
+                // 启用 WS keepalive ping：默认每 30s 发 ping，40s 内收不到 pong 即判定
+                // 连接失活并主动断开。否则浏览器异常断开（刷新页面 / 反代 / 网络抖动）
+                // 产生的僵尸连接无法被回收，会持续占用 max_connections 名额，最终打满
+                // 上限导致后续所有新连接（含 Agent 的 WS 重连）被 429 拒绝。
+                .enable_ws_ping(jsonrpsee::server::PingConfig::default())
                 .build(),
         )
         .to_service_builder()
